@@ -42,12 +42,12 @@ app.get("/api/health", (_req, res) => {
 
 import authRoutes from "./routes/auth";
 import productRoutes from "./routes/products";
-// import analysisRoutes from "./routes/analyses"; // Şimdilik kapalı
+import analysisRoutes from "./routes/analyses";
 
 // ─── API Route'ları ───
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
-// app.use("/api/analyses", analysisRoutes);
+app.use("/api/analyses", analysisRoutes);
 
 // ─── 404 Handler ───
 app.use("/api/{*path}", (_req, res) => {
