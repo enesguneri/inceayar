@@ -13,3 +13,7 @@
 # IDE Dosyaları
 **/.idea/
 **/.vscode/
+**/.vs/
+
+# Documents
+/docs
