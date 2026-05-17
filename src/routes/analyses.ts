@@ -1,8 +1,10 @@
 import { Router, Request, Response, NextFunction } from "express";
 import EventEmitter from "events";
+import { z } from "zod";
 import { protect } from "../middleware/auth";
-import { sendSuccess, sendError } from "../utils/response";
-import { NotFoundError } from "../utils/errors";
+import { validate } from "../middleware/validate";
+import { sendSuccess } from "../utils/response";
+import { NotFoundError, ValidationError } from "../utils/errors";
 import Analysis from "../models/Analysis";
 import Product from "../models/Product";
 import { app } from "../ai/graph";
@@ -13,8 +15,23 @@ router.use(protect);
 // Global event emitter for SSE
 const analysisEmitter = new EventEmitter();
 
+// ─── Zod Validation Şemaları ───
+
+const competitorReviewSchema = z.object({
+  body: z.object({
+    reviews: z.array(
+      z.object({
+        rating: z.number().min(1).max(5).optional(),
+        comment: z.string().min(5, "Her yorum en az 5 karakter olmalı"),
+      })
+    ).min(3, "En az 3 rakip yorumu gereklidir"),
+  }),
+});
+
+// ─── Endpoint'ler ───
+
 /**
- * 1. Analizi Başlat
+ * 1. Analizi Başlat (Rakip yorumları opsiyonel olarak body'den alabilir)
  * POST /api/analyses/start/:productId
  */
 router.post("/start/:productId", async (req: Request, res: Response, next: NextFunction) => {
@@ -28,25 +45,29 @@ router.post("/start/:productId", async (req: Request, res: Response, next: NextF
       throw new NotFoundError("Ürün");
     }
 
-    // Sahte Rakip Yorumları (Şimdilik mock data. İleride Trendyol/Hepsiburada API'den çekilecek)
-    const mockCompetitorReviews = [
-      { rating: 2, comment: "Kumaşı çok terletiyor, dikişleri hemen koptu." },
-      { rating: 3, comment: "Rengi resimdeki gibi canlı değil ama idare eder." },
-      { rating: 1, comment: "Paketleme berbattı, ürün yırtık geldi." }
-    ];
+    // Rakip yorumlarını belirle: body'den geldiyse onu kullan, yoksa mock data
+    let competitorReviews = req.body?.competitorReviews;
+
+    if (!competitorReviews || competitorReviews.length === 0) {
+      // Sahte Rakip Yorumları (Fallback mock data)
+      competitorReviews = [
+        { rating: 2, comment: "Kumaşı çok terletiyor, dikişleri hemen koptu." },
+        { rating: 3, comment: "Rengi resimdeki gibi canlı değil ama idare eder." },
+        { rating: 1, comment: "Paketleme berbattı, ürün yırtık geldi." }
+      ];
+    }
 
     // Yeni analiz kaydı oluştur
     const analysis = await Analysis.create({
       userId,
       productId,
-      competitorReviews: mockCompetitorReviews,
+      competitorReviews,
       status: "processing",
       currentAgent: "researcher"
     });
 
     // Arka planda Langgraph sürecini başlat (async)
-    // Beklemeden asenkron çalışır
-    runLanggraphProcess(analysis._id.toString(), product, mockCompetitorReviews).catch(err => {
+    runLanggraphProcess(analysis._id.toString(), product, competitorReviews).catch(err => {
       console.error("Langgraph Error:", err);
     });
 
@@ -58,59 +79,55 @@ router.post("/start/:productId", async (req: Request, res: Response, next: NextF
 });
 
 /**
- * Arka planda Langgraph akışını çalıştırır ve veritabanını günceller.
+ * 2. Mevcut bir analize rakip yorum ekle (GR-03)
+ * POST /api/analyses/:id/competitors
  */
-async function runLanggraphProcess(analysisId: string, product: any, competitorReviews: any[]) {
+router.post("/:id/competitors", validate(competitorReviewSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const initialState = {
-      product: product.toObject(),
-      competitorReviews,
-      analysisId,
-      currentAgent: "researcher"
-    };
+    const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.user!.userId });
+    if (!analysis) {
+      throw new NotFoundError("Analiz");
+    }
 
-    // Langgraph'i stream modunda çalıştır
-    const stream = await app.stream(initialState);
-
-    for await (const chunk of stream) {
-      // Chunk, ajanların döndüğü state objesini içerir (ör: { researcher: { ... } })
-      const agentName = Object.keys(chunk)[0];
-      if (!agentName) continue;
-      const stateUpdate = (chunk as any)[agentName];
-
-      // Veritabanını güncelle
-      await Analysis.findByIdAndUpdate(analysisId, {
-        $set: {
-          currentAgent: stateUpdate.currentAgent || agentName,
-          researchFindings: stateUpdate.researchFindings,
-          draftDescription: stateUpdate.draftDescription,
-          seoKeywords: stateUpdate.seoKeywords,
-          riskReport: stateUpdate.riskReport,
-          finalDescription: stateUpdate.finalDescription,
-          revisionNotes: stateUpdate.revisionNotes,
-        }
-      });
-
-      // SSE dinleyicilerine haber ver
-      analysisEmitter.emit(`update_${analysisId}`, {
-        agent: agentName,
-        state: stateUpdate
+    // Sadece henüz başlamamış veya tamamlanmış analizlere yorum eklenebilir
+    if (analysis.status === "processing") {
+      throw new ValidationError("Devam eden bir analize yorum eklenemez", {
+        status: ["Analiz şu an işleniyor, lütfen tamamlanmasını bekleyin."]
       });
     }
 
-    // Süreç bittiğinde tamamlandı olarak işaretle
-    await Analysis.findByIdAndUpdate(analysisId, { status: "completed" });
-    analysisEmitter.emit(`update_${analysisId}`, { status: "completed" });
+    // Mevcut yorumları güncelle
+    analysis.competitorReviews = req.body.reviews;
+    await analysis.save();
 
-  } catch (error: any) {
-    console.error(`Analysis ${analysisId} failed:`, error);
-    await Analysis.findByIdAndUpdate(analysisId, { status: "failed", error: error.message });
-    analysisEmitter.emit(`update_${analysisId}`, { status: "failed", error: error.message });
+    sendSuccess(res, { message: "Rakip yorumları güncellendi", reviewCount: req.body.reviews.length });
+  } catch (error) {
+    next(error);
   }
-}
+});
 
 /**
- * 2. SSE ile Gerçek Zamanlı Takip
+ * 3. Bir analizin rakip yorumlarını getir (GR-03)
+ * GET /api/analyses/:id/competitors
+ */
+router.get("/:id/competitors", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const analysis = await Analysis.findOne({ _id: req.params.id, userId: req.user!.userId });
+    if (!analysis) {
+      throw new NotFoundError("Analiz");
+    }
+
+    sendSuccess(res, {
+      reviewCount: analysis.competitorReviews.length,
+      reviews: analysis.competitorReviews,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * 4. SSE ile Gerçek Zamanlı Takip
  * GET /api/analyses/:id/stream
  */
 router.get("/:id/stream", async (req: Request, res: Response) => {
@@ -121,7 +138,6 @@ router.get("/:id/stream", async (req: Request, res: Response) => {
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
-  // Veritabanından kontrol et
   const analysis = await Analysis.findById(id);
   if (!analysis) {
     res.write(`data: ${JSON.stringify({ error: "Analiz bulunamadı" })}\n\n`);
@@ -129,14 +145,12 @@ router.get("/:id/stream", async (req: Request, res: Response) => {
     return;
   }
 
-  // Eğer zaten bitmişse direkt bitiş bilgisini gönder
   if (analysis.status === "completed" || analysis.status === "failed") {
     res.write(`data: ${JSON.stringify({ status: analysis.status })}\n\n`);
     res.end();
     return;
   }
 
-  // Olay dinleyicisi
   const onUpdate = (data: any) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
     if (data.status === "completed" || data.status === "failed") {
@@ -147,14 +161,47 @@ router.get("/:id/stream", async (req: Request, res: Response) => {
 
   analysisEmitter.on(`update_${id}`, onUpdate);
 
-  // Client bağlantıyı koparırsa dinleyiciyi temizle
   req.on("close", () => {
     analysisEmitter.off(`update_${id}`, onUpdate);
   });
 });
 
 /**
- * 3. Tamamlanan Analizi Getir
+ * 5. Kullanıcının tüm analizlerini listele (GR-06)
+ * GET /api/analyses
+ */
+router.get("/", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const skip = (page - 1) * limit;
+
+    const [analyses, total] = await Promise.all([
+      Analysis.find({ userId: req.user!.userId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select("-competitorReviews -researchFindings -draftDescription -riskReport")
+        .lean(),
+      Analysis.countDocuments({ userId: req.user!.userId }),
+    ]);
+
+    sendSuccess(res, {
+      analyses,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * 6. Tamamlanan Analizi Getir
  * GET /api/analyses/:id
  */
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
@@ -168,5 +215,54 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
     next(error);
   }
 });
+
+// ─── Arka Plan İşleme ───
+
+/**
+ * Arka planda Langgraph akışını çalıştırır ve veritabanını günceller.
+ */
+async function runLanggraphProcess(analysisId: string, product: any, competitorReviews: any[]) {
+  try {
+    const initialState = {
+      product: product.toObject(),
+      competitorReviews,
+      analysisId,
+      currentAgent: "researcher"
+    };
+
+    const stream = await app.stream(initialState);
+
+    for await (const chunk of stream) {
+      const agentName = Object.keys(chunk)[0];
+      if (!agentName) continue;
+      const stateUpdate = (chunk as any)[agentName];
+
+      await Analysis.findByIdAndUpdate(analysisId, {
+        $set: {
+          currentAgent: stateUpdate.currentAgent || agentName,
+          researchFindings: stateUpdate.researchFindings,
+          draftDescription: stateUpdate.draftDescription,
+          seoKeywords: stateUpdate.seoKeywords,
+          riskReport: stateUpdate.riskReport,
+          finalDescription: stateUpdate.finalDescription,
+          revisionNotes: stateUpdate.revisionNotes,
+        }
+      });
+
+      analysisEmitter.emit(`update_${analysisId}`, {
+        agent: agentName,
+        state: stateUpdate
+      });
+    }
+
+    await Analysis.findByIdAndUpdate(analysisId, { status: "completed" });
+    analysisEmitter.emit(`update_${analysisId}`, { status: "completed" });
+
+  } catch (error: any) {
+    console.error(`Analysis ${analysisId} failed:`, error);
+    await Analysis.findByIdAndUpdate(analysisId, { status: "failed", error: error.message });
+    analysisEmitter.emit(`update_${analysisId}`, { status: "failed", error: error.message });
+  }
+}
 
 export default router;

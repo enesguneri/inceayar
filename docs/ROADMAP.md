@@ -43,14 +43,14 @@
 - [x] Risk Denetçi ajan — Multimodal Vision (`src/ai/agents/auditor.ts`)
 - [x] Düzeltmen ajan (`src/ai/agents/editor.ts`)
 - [x] Ana akış grafiği (`src/ai/graph.ts`)
-- [ ] Rakip veri girişi — gerçek scraping (GR-03)
+- [x] Rakip veri girişi — API endpoint (GR-03)
 
 ### Analiz Motoru
 - [x] Analysis modeli (Mongoose)
 - [x] Analiz başlatma endpoint
 - [x] SSE gerçek zamanlı durum akışı (GR-04)
 - [x] Sonuç raporlama endpoint'leri (GR-05)
-- [ ] Hata yönetimi ve retry mekanizması
+- [x] Hata yönetimi ve retry mekanizması
 
 ---
 

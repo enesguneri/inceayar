@@ -2,6 +2,7 @@ import { llm } from "../../config/gemini";
 import { z } from "zod";
 import { AnalysisStateType } from "../state";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { withRetry } from "../../utils/retry";
 
 const auditorSchema = z.object({
   riskReport: z.object({
@@ -59,7 +60,7 @@ Avantajlar: ${state.product.advantages}
     new HumanMessage({ content: contentParams })
   ];
 
-  const result = await structuredLlm.invoke(messages);
+  const result = await withRetry(() => structuredLlm.invoke(messages));
 
   return {
     riskReport: result.riskReport,

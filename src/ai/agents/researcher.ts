@@ -2,6 +2,7 @@ import { llm } from "../../config/gemini";
 import { z } from "zod";
 import { AnalysisStateType } from "../state";
 import { PromptTemplate } from "@langchain/core/prompts";
+import { withRetry } from "../../utils/retry";
 
 const researcherSchema = z.object({
   chronicIssues: z.array(
@@ -50,7 +51,7 @@ export const researcherAgent = async (state: AnalysisStateType): Promise<Partial
     competitorReviews: reviewsText || "Henüz rakip yorumu yok.",
   });
 
-  const result = await structuredLlm.invoke(formattedPrompt);
+  const result = await withRetry(() => structuredLlm.invoke(formattedPrompt));
 
   return {
     researchFindings: result as any, // Zod schema ile arayüz eşleşiyor

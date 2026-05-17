@@ -2,6 +2,7 @@ import { llm } from "../../config/gemini";
 import { z } from "zod";
 import { AnalysisStateType } from "../state";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { withRetry } from "../../utils/retry";
 
 const editorSchema = z.object({
   finalDescription: z.string().describe("Risk raporuna göre revize edilmiş ve ince ayar çekilmiş son satış metni."),
@@ -41,7 +42,7 @@ Marka: ${state.product.brand}
     new HumanMessage("Lütfen risk raporunu inceleyerek taslak metni revize et ve düzeltme notlarını oluştur.")
   ];
 
-  const result = await structuredLlm.invoke(messages);
+  const result = await withRetry(() => structuredLlm.invoke(messages));
 
   return {
     finalDescription: result.finalDescription,

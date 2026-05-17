@@ -2,6 +2,7 @@ import { llm } from "../../config/gemini";
 import { z } from "zod";
 import { AnalysisStateType } from "../state";
 import { PromptTemplate } from "@langchain/core/prompts";
+import { withRetry } from "../../utils/retry";
 
 const writerSchema = z.object({
   draftDescription: z.string().describe("SEO uyumlu ve ikna edici taslak e-ticaret ürün açıklaması"),
@@ -41,11 +42,11 @@ export const writerAgent = async (state: AnalysisStateType): Promise<Partial<Ana
     researchFindings: JSON.stringify(state.researchFindings || {}),
   });
 
-  const result = await structuredLlm.invoke(formattedPrompt);
+  const result = await withRetry(() => structuredLlm.invoke(formattedPrompt));
 
   return {
     draftDescription: result.draftDescription,
     seoKeywords: result.seoKeywords,
-    currentAgent: "reviewer", // Bir sonraki ajana geçir
+    currentAgent: "auditor", // Bir sonraki ajana geçir
   };
 };
