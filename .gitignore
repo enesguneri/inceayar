@@ -1,0 +1,15 @@
+# Herhangi bir yerdeki node_modules klasörlerini yoksay
+**/node_modules/
+
+# Ortam Değişkenleri
+**/.env
+**/.env.local
+
+# Build Çıktıları
+**/dist/
+**/build/
+**/.next/
+
+# IDE Dosyaları
+**/.idea/
+**/.vscode/
