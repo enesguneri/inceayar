@@ -3,8 +3,8 @@ import { env } from "./env";
 
 /**
  * Gemini AI Model Konfigürasyonu
- * Model olarak daha yeni, çok modlu (multimodal), hızlı ve ücretsiz sürümleri olan
- * "gemini-2.0-flash" kullanıyoruz.
+ * Model olarak en güncel, çok modlu (multimodal), hızlı ve yüksek limitlere sahip
+ * "gemini-3.1-flash-lite" kullanıyoruz.
  */
 export const llm = new ChatGoogleGenerativeAI({
   apiKey: env.GEMINI_API_KEY,
