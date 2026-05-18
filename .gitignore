@@ -14,3 +14,10 @@
 **/.idea/
 **/.vscode/
 **/.vs/
+
+# Geçici Test Klasörleri ve Çıktıları
+/scratch/
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json

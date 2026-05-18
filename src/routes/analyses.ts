@@ -9,11 +9,71 @@ import Analysis from "../models/Analysis";
 import Product from "../models/Product";
 import { app } from "../ai/graph";
 
+import jwt from "jsonwebtoken";
+import { env } from "../config/env";
+
 const router = Router();
-router.use(protect);
 
 // Global event emitter for SSE
 const analysisEmitter = new EventEmitter();
+
+/**
+ * 4. SSE ile Gerçek Zamanlı Takip (Yol koruması el ile yapılıyor çünkü EventSource header gönderemez)
+ * GET /api/analyses/:id/stream
+ */
+router.get("/:id/stream", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const token = (req.query.token as string) || req.headers.authorization?.split(" ")[1];
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  if (!token) {
+    res.write(`data: ${JSON.stringify({ error: "Erişim token'ı gerekli" })}\n\n`);
+    res.end();
+    return;
+  }
+
+  try {
+    jwt.verify(token, env.JWT_SECRET);
+  } catch (err) {
+    res.write(`data: ${JSON.stringify({ error: "Geçersiz veya süresi dolmuş token" })}\n\n`);
+    res.end();
+    return;
+  }
+
+  const analysis = await Analysis.findById(id);
+  if (!analysis) {
+    res.write(`data: ${JSON.stringify({ error: "Analiz bulunamadı" })}\n\n`);
+    res.end();
+    return;
+  }
+
+  if (analysis.status === "completed" || analysis.status === "failed") {
+    res.write(`data: ${JSON.stringify({ status: analysis.status, state: analysis })}\n\n`);
+    res.end();
+    return;
+  }
+
+  const onUpdate = (data: any) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    if (data.status === "completed" || data.status === "failed") {
+      res.end();
+      analysisEmitter.off(`update_${id}`, onUpdate);
+    }
+  };
+
+  analysisEmitter.on(`update_${id}`, onUpdate);
+
+  req.on("close", () => {
+    analysisEmitter.off(`update_${id}`, onUpdate);
+  });
+});
+
+router.use(protect);
+
 
 // ─── Zod Validation Şemaları ───
 
@@ -25,6 +85,13 @@ const competitorReviewSchema = z.object({
         comment: z.string().min(5, "Her yorum en az 5 karakter olmalı"),
       })
     ).min(3, "En az 3 rakip yorumu gereklidir"),
+  }),
+});
+
+const scrapeAnalysisSchema = z.object({
+  body: z.object({
+    productId: z.string().min(1, "Ürün ID gereklidir"),
+    url: z.string().url("Geçerli bir URL giriniz"),
   }),
 });
 
@@ -79,6 +146,49 @@ router.post("/start/:productId", async (req: Request, res: Response, next: NextF
 });
 
 /**
+ * 1.1 Analizi Başlat (Trendyol/Hepsiburada Linki ile)
+ * POST /api/analyses/scrape
+ */
+router.post("/scrape", validate(scrapeAnalysisSchema), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const { productId, url } = req.body;
+
+    // Ürünü bul
+    const product = await Product.findOne({ _id: productId, userId });
+    if (!product) {
+      throw new NotFoundError("Ürün");
+    }
+
+    // Scraper servisini çağır
+    const { scrapeReviews } = await import("../services/scraper");
+    const scraperResult = await scrapeReviews(url);
+
+    // Yeni analiz kaydı oluştur
+    const analysis = await Analysis.create({
+      userId,
+      productId,
+      competitorReviews: scraperResult,
+      status: "processing",
+      currentAgent: "researcher"
+    });
+
+    // Arka planda Langgraph sürecini başlat (async)
+    runLanggraphProcess(analysis._id.toString(), product, scraperResult).catch(err => {
+      console.error("Langgraph Error:", err);
+    });
+
+    // Client'a ID dön
+    sendSuccess(res, { 
+      analysisId: analysis._id.toString(),
+      reviewCount: scraperResult.length
+    }, 202);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * 2. Mevcut bir analize rakip yorum ekle (GR-03)
  * POST /api/analyses/:id/competitors
  */
@@ -126,45 +236,7 @@ router.get("/:id/competitors", async (req: Request, res: Response, next: NextFun
   }
 });
 
-/**
- * 4. SSE ile Gerçek Zamanlı Takip
- * GET /api/analyses/:id/stream
- */
-router.get("/:id/stream", async (req: Request, res: Response) => {
-  const { id } = req.params;
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
-
-  const analysis = await Analysis.findById(id);
-  if (!analysis) {
-    res.write(`data: ${JSON.stringify({ error: "Analiz bulunamadı" })}\n\n`);
-    res.end();
-    return;
-  }
-
-  if (analysis.status === "completed" || analysis.status === "failed") {
-    res.write(`data: ${JSON.stringify({ status: analysis.status })}\n\n`);
-    res.end();
-    return;
-  }
-
-  const onUpdate = (data: any) => {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-    if (data.status === "completed" || data.status === "failed") {
-      res.end();
-      analysisEmitter.off(`update_${id}`, onUpdate);
-    }
-  };
-
-  analysisEmitter.on(`update_${id}`, onUpdate);
-
-  req.on("close", () => {
-    analysisEmitter.off(`update_${id}`, onUpdate);
-  });
-});
 
 /**
  * 5. Kullanıcının tüm analizlerini listele (GR-06)
