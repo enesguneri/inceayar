@@ -1,6 +1,6 @@
 # 📋 İnceAyar — Ürün Gereksinim Dökümanı (PRD)
 
-> **Versiyon:** 1.0.0 | **Tarih:** 2026-05-17 | **Durum:** Taslak
+> **Versiyon:** 1.1.0 | **Tarih:** 2026-05-19 | **Durum:** Aktif
 
 ---
 
@@ -36,19 +36,23 @@ POST /api/auth/register | POST /api/auth/login | POST /api/auth/refresh | GET /a
 ### GR-02: Ürün Veri Girişi (P0)
 
 - Ürün adı, kategori, marka, özellikler girilebilmeli
+- **[YENİ] URL ile Hızlı Ürün Ekleme:** Trendyol linki yapıştırılarak ürün özellikleri ve detayları otomatik form alanlarına çekilebilmeli
+- **Not:** Hepsiburada ve diğer platform desteği yakında eklenecektir
 - 1-5 arası fotoğraf yüklenebilmeli (JPEG, PNG, WebP, max 5MB)
 - Yüklenen fotoğrafların ön izlemesi gösterilebilmeli
 
 ```
 POST /api/products | GET /api/products | GET /api/products/:id
 PUT /api/products/:id | DELETE /api/products/:id | POST /api/products/:id/images
+POST /api/products/scrape-details (Linkten ürün verisi çekme)
 ```
 
 ### GR-03: Rakip Hedefleme (P0)
 
 - Rakip yorumları CSV/JSON olarak veya manuel girilebilmeli
 - Minimum 5 yorum zorunlu
-- Rakip ürün URL'si eklenebilmeli
+- Rakip ürün URL'si eklenebilmeli (Trendyol desteklenmektedir, Hepsiburada yakında)
+- **[YENİ]** Asıl ürünün (kullanıcının kendi ürünü) Trendyol linkinden kendi müşteri yorumları çekilerek zıtlaştırma analizine sokulabilmeli
 
 ```
 POST /api/analyses/:id/competitors | GET /api/analyses/:id/competitors

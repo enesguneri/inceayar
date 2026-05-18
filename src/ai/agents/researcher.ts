@@ -18,7 +18,7 @@ const researcherSchema = z.object({
 
 const prompt = PromptTemplate.fromTemplate(`
 Sen e-ticaret dünyasında uzman bir Pazar Araştırmacısı (Market Researcher) ajansın.
-Görev: Sana verilen rakip ürün yorumlarını analiz ederek, pazardaki zafiyetleri ve bizim ürünümüzün nasıl öne çıkabileceğini bulmak.
+Görev: Sana verilen rakip ürün yorumlarını analiz ederek pazardaki zafiyetleri bulmak. Eğer bizim ürünümüzün kendi müşteri yorumları (Kendi Ürün Yorumlarımız) da verilmişse, rakipteki şikayetlerle bizim ürünümüzdeki övgüleri zıtlaştır (Super Mod).
 
 Bizim Ürünümüz:
 İsim: {productName}
@@ -29,20 +29,31 @@ Bizim Belirttiğimiz Avantajlar: {advantages}
 Rakip Ürün Yorumları:
 {competitorReviews}
 
-Lütfen bu yorumları dikkatlice oku. Müşterilerin rakiplerde en çok neden şikayet ettiğini bul.
-Ardından, bizim ürünümüzün özelliklerini göz önünde bulundurarak, bu şikayetleri nasıl kendi avantajımıza çevirebileceğimize dair pazarlama avantajları (marketingAdvantages) çıkar.
+Kendi Ürün Yorumlarımız (Opsiyonel - Eğer varsa bizim zayıf/güçlü yönlerimiz):
+{ownReviews}
+
+Lütfen bu yorumları dikkatlice oku. 
+1. Müşterilerin rakiplerde en çok neden şikayet ettiğini bul.
+2. (Eğer Kendi Ürün Yorumlarımız varsa): Rakipte şikayet edilen noktanın bizim ürünümüzde sevilip sevilmediğine bak. Ayrıca bumerang etkisi olmaması için bizim ürünümüzde eleştirilen şeyleri dürüstçe analiz et.
+3. Bu verilerle, rakibin şikayetlerini ve (varsa) bizim güçlü yönlerimizi harmanlayarak pazarlama avantajları (marketingAdvantages) çıkar.
 `);
 
 export const researcherAgent = async (state: AnalysisStateType): Promise<Partial<AnalysisStateType>> => {
   console.log("🕵️‍♂️ [Researcher] Ajan çalışıyor...");
 
   const structuredLlm = llm.withStructuredOutput(researcherSchema, { name: "research_report" });
+  
   // Yorumları parti parti (chunking) işlemek için 25'erli gruplara bölelim
   const chunkSize = 25;
   const reviewChunks = [];
   for (let i = 0; i < state.competitorReviews.length; i += chunkSize) {
     reviewChunks.push(state.competitorReviews.slice(i, i + chunkSize));
   }
+
+  // Kendi yorumlarımızı birleştir
+  const ownReviewsText = state.ownReviews && state.ownReviews.length > 0 
+    ? state.ownReviews.map(r => `Puan: ${r.rating || "?"}/5 - Yorum: ${r.comment}`).join("\n\n")
+    : "Kendi ürün yorumu bulunmuyor. Sadece rakip yorumlarına odaklan.";
 
   const aggregatedFindings = {
     chronicIssues: [] as any[],
@@ -63,6 +74,7 @@ export const researcherAgent = async (state: AnalysisStateType): Promise<Partial
       features: JSON.stringify(state.product.features || {}),
       advantages: state.product.advantages || "Belirtilmemiş",
       competitorReviews: reviewsText || "Henüz rakip yorumu yok.",
+      ownReviews: ownReviewsText,
     });
 
     const result = await withRetry(() => structuredLlm.invoke(formattedPrompt)) as any;

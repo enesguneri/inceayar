@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { productApi, analysisApi, Product } from '@/lib/services';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { ArrowLeft, Link as LinkIcon, Target, Package, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Link as LinkIcon, Target, Package, ChevronDown, Clock } from 'lucide-react';
 
 export default function NewAnalysisPage() {
   const router = useRouter();
@@ -108,19 +108,25 @@ export default function NewAnalysisPage() {
         <div className="glass-dark rounded-2xl border border-white/5 p-6 space-y-4">
           <h2 className="text-base font-semibold text-white flex items-center gap-2">
             <LinkIcon className="w-4 h-4 text-brand-400" />
-            2. Rakip Ürün Linki (Trendyol / Hepsiburada)
+            2. Rakip Ürün Linki (Trendyol)
           </h2>
           <p className="text-xs text-slate-400 -mt-1">AI bu listedeki müşteri yorumlarını analiz edecek ve sizin ürününüzün pazarlama metnini yazacak.</p>
           <Input
             type="url"
-            placeholder="https://www.trendyol.com/urun-adi-p-123456/yorumlar"
+            placeholder="https://www.trendyol.com/marka/urun-adi-p-123456"
             value={competitorUrl}
             onChange={e => setCompetitorUrl(e.target.value)}
             icon={<LinkIcon className="w-4 h-4" />}
             required
           />
           <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
-            <p className="text-xs text-blue-300">💡 <strong>İpucu:</strong> Daha iyi sonuçlar için doğrudan <code className="bg-white/10 rounded px-1">/yorumlar</code> sayfasına giden linki kullanın.</p>
+            <p className="text-xs text-blue-300">💡 <strong>İpucu:</strong> Daha iyi sonuçlar için yorum sayısı fazla olan bir Trendyol ürün linki kullanın.</p>
+          </div>
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+            <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <p className="text-xs text-amber-300">
+              <strong>Hepsiburada</strong> ve diğer platformlar yakında desteklenecek.
+            </p>
           </div>
         </div>
 

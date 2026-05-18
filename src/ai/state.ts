@@ -25,6 +25,10 @@ export const AnalysisState = Annotation.Root({
   competitorReviews: Annotation<any[]>({
     reducer: (x, y) => y ?? x,
   }),
+  ownReviews: Annotation<any[]>({
+    reducer: (x, y) => y ?? x,
+    default: () => [],
+  }),
 
   // Ajan çıktıları
   researchFindings: Annotation<ResearchFindings | null>({

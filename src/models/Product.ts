@@ -8,6 +8,7 @@ export interface IProduct extends Document {
     features: Record<string, string>; // Dinamik özellikler için
     advantages: string;
     images: string[]; // Fotoğraf URL'leri (Maksimum 5)
+    url?: string; // Asıl ürünün varsa pazar yeri linki
     createdAt: Date;
     updatedAt: Date;
 }
@@ -22,7 +23,8 @@ const ProductSchema: Schema = new Schema({
     images: {
         type: [String],
         validate: [(val: string[]) => val.length <= 5, 'Maksimum 5 fotoğraf yüklenebilir']
-    }
+    },
+    url: { type: String, required: false }
 }, { timestamps: true });
 
 export default mongoose.model<IProduct>('Product', ProductSchema);

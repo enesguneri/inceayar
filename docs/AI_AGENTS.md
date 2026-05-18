@@ -24,6 +24,7 @@ interface AnalysisState {
   // Girdiler
   product: IProduct;
   competitorReviews: any[];
+  ownReviews?: any[]; // Kullanıcının kendi ürününün yorumları (varsa)
 
   // Araştırmacı çıktısı
   researchFindings: {
@@ -64,15 +65,16 @@ interface AnalysisState {
 
 **Model:** Gemini 3.1 Flash Lite
 
-**Girdi:** `competitorReviews[]`
+**Girdi:** `competitorReviews[]` + *(Opsiyonel)* `ownReviews[]`
 
 **Çıktı:** `researchFindings`
 
 **Prompt Stratejisi:**
-- Negatif yorumları kategorize et (kalite, paketleme, beden, renk, teslimat vb.)
-- Her kategorideki şikayet frekansını hesapla
-- En kritik 3-5 kronik sorunu önem sırasına göre listele
-- Her sorunun müşteri deneyimine etkisini değerlendir
+- Sadece rakip yorumları varsa: Rakibin negatif yorumlarını kategorize et ve en kritik sorunları listele.
+- Eğer kullanıcının kendi ürün yorumları (`ownReviews`) da verilmişse (Süper Mod):
+  - Rakipte en çok şikayet edilen noktalar ile kullanıcının kendi ürününde en çok övülen/sevilen noktaları karşılaştır (Zıtlaştırma analizi).
+  - Kullanıcının kendi ürünündeki olası zayıf noktaları da dürüstçe belirle (Bumerang etkisi yaratmamak için).
+- Her kategorideki şikayet frekansını hesapla ve en kritik 3-5 kronik sorunu listele.
 
 ---
 
@@ -105,16 +107,16 @@ interface AnalysisState {
 
 **Model:** Gemini 3.1 Flash Lite (Multimodal/Vision)
 
-**Girdi:** `draftDescription` + `product.images[]`
+**Girdi:** `draftDescription` + `product.images[]` + *(Opsiyonel)* `ownReviews[]`
 
 **Çıktı:** `riskReport`
 
 **Prompt Stratejisi:**
 - Her fotoğrafı metin iddiaları açısından denetle
+- **Bumerang Etkisi Kontrolü:** Eğer yazılan metin rakibe bir konuda (örn. şarj) yükleniyorsa ama kullanıcının kendi ürün yorumlarında (`ownReviews`) da aynı konudan şikayet edilmişse, bu iddiayı "Kritik Risk" olarak işaretle!
 - Renk, boyut, malzeme, kalite vaatlerini fotoğrafla karşılaştır
 - Aşırı yükseltilmiş beklenti ifadelerini tespit et
 - Her uyumsuzluk için 0-100 arası risk skoru ata
-- Risk kategorileri: Renk uyumsuzluğu, boyut yanılsaması, malzeme algısı, kalite abartısı
 
 **Risk Seviyeleri:**
 | Skor Aralığı | Seviye | Aksiyon |

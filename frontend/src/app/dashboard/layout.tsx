@@ -2,21 +2,22 @@
 import React from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
-import { useAuthStore } from '@/store/useAuthStore';
+import { useAuthStore, useAuthHydration } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
+  const hydrated = useAuthHydration();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (hydrated && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [hydrated, isAuthenticated, router]);
 
-  if (!isAuthenticated) return null;
+  if (!hydrated || !isAuthenticated) return null;
 
   return (
     <div className="flex h-screen overflow-hidden">

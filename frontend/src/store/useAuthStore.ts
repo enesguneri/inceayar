@@ -29,3 +29,23 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+import { useState, useEffect } from 'react';
+
+export const useAuthHydration = () => {
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    // Zustand zaten hydrate olduysa true yap
+    setHydrated(useAuthStore.persist.hasHydrated());
+    
+    // Henüz olmadıysa, bittiğinde true yap
+    const unsubFinish = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+    
+    return () => {
+      unsubFinish();
+    };
+  }, []);
+
+  return hydrated;
+};

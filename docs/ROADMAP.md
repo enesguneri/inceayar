@@ -1,6 +1,6 @@
 # 🗺️ İnceAyar — Geliştirme Yol Haritası
 
-> **Son Güncelleme:** 2026-05-17
+> **Son Güncelleme:** 2026-05-19
 
 ---
 
@@ -29,7 +29,7 @@
 
 ---
 
-## Sprint 2: AI Altyapısı
+## Sprint 2: AI Altyapısı,
 
 ### Gemini API Entegrasyonu
 - [x] Gemini client yapılandırması (`gemini-3.1-flash-lite`)
@@ -52,32 +52,41 @@
 - [x] Sonuç raporlama endpoint'leri (GR-05)
 - [x] Hata yönetimi ve retry mekanizması
 
+### Platform Desteği (Scraper)
+- [x] Trendyol yorum çekme (Puppeteer + Stealth)
+- [x] Trendyol ürün detay çekme (`window.__envoy__SHARED_PROPS`)
+- [x] Trendyol link ile ürün ekleme (Süper Mod)
+- [ ] Hepsiburada yorum çekme (☕ Yakında — Anti-bot koruması araştırılıyor)
+- [ ] Hepsiburada ürün detay çekme (☕ Yakında)
+- [ ] Amazon TR desteği (📅 Planlanan)
+- [ ] N11 desteği (📅 Planlanan)
+
 ---
 
 ## Sprint 3: Frontend Temeli
-- [ ] Next.js projesi oluşturma
-- [ ] Tailwind CSS yapılandırma
-- [ ] Layout sistemi (Header, Sidebar)
-- [ ] Login / Register sayfaları
-- [ ] Auth state yönetimi
+- [x] Next.js projesi oluşturma
+- [x] Tailwind CSS yapılandırma
+- [x] Layout sistemi (Header, Sidebar)
+- [x] Login / Register sayfaları
+- [x] Auth state yönetimi (Zustand + hydration düzeltmesi)
 
 ---
 
 ## Sprint 4: Frontend Tamamlama
 
 ### Dashboard Sayfaları
-- [ ] Ürün oluşturma / listeleme sayfası
-- [ ] Yeni analiz başlatma sayfası
-- [ ] Gerçek zamanlı analiz izleme UI
-- [ ] Sonuç görüntüleme sayfası
-- [ ] Geçmiş analizler listesi (GR-06)
+- [x] Ürün oluşturma / listeleme sayfası
+- [x] Yeni analiz başlatma sayfası
+- [x] Gerçek zamanlı analiz izleme UI
+- [x] Sonuç görüntüleme sayfası
+- [x] Geçmiş analizler listesi (GR-06)
 
 ### Son Düzeltmeler
-- [ ] Rate limiting
-- [ ] CORS yapılandırması
-- [ ] Responsive tasarım
-- [ ] Error handling UI
-- [ ] Loading state'leri
+- [x] Rate limiting / Error handling UI
+- [x] CORS yapılandırması
+- [x] Responsive tasarım
+- [x] Error handling UI ve Toast bildirimleri
+- [x] Loading state'leri
 
 ---
 
@@ -87,4 +96,4 @@
 - [ ] Performans optimizasyonu
 - [ ] Güvenlik denetimi
 - [ ] Deployment yapılandırması
-- [ ] Production build ve test
+- [x] Production build ve test (Frontend & Backend local testler)

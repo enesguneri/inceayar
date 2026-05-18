@@ -2,10 +2,6 @@
 
 > E-ticaret satıcıları için Gemini destekli, çoklu ajan tabanlı ürün metni optimizasyon ve iade riski analiz platformu.
 
-![License](https://img.shields.io/badge/license-ISC-blue)
-![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)
-
 ---
 
 ## 📋 İçindekiler
@@ -98,7 +94,17 @@ E-ticaret ekosisteminde satıcıların en büyük iki problemi:
 | **AI Motor** | Gemini API (Multimodal) | Metin ve görsel işleme |
 | **AI Araçları** | Langchain.js | Veri çekme, prompt şablonlama |
 | **AI Orkestrasyon** | Langgraph | Stateful ajan yönetimi |
+| **Scraper** | Puppeteer + Stealth Plugin | Ürün yorumu & detay kazıma |
 | **Kimlik Doğrulama** | JWT | Güvenli oturum yönetimi |
+
+### Desteklenen Platformlar
+
+| Platform | Yorum Çekme | Ürün Detay Çekme | Durum |
+|----------|-------------|-------------------|-------|
+| **Trendyol** | ✅ Aktif | ✅ Aktif | Tam destek |
+| **Hepsiburada** | ⏳ Yakında | ⏳ Yakında | Geliştirme aşamasında |
+| **Amazon TR** | 📅 Planlanan | 📅 Planlanan | Yol haritasında |
+| **N11** | 📅 Planlanan | 📅 Planlanan | Yol haritasında |
 
 ---
 
@@ -115,7 +121,7 @@ E-ticaret ekosisteminde satıcıların en büyük iki problemi:
 
 ```bash
 # 1. Repoyu klonlayın
-git clone https://github.com/<kullanici>/inceayar.git
+git clone https://github.com/enesguneri/inceayar.git
 cd inceayar
 
 # 2. Backend bağımlılıklarını kurun
@@ -236,6 +242,3 @@ chore:    Bakım işleri
 
 ---
 
-## 📄 Lisans
-
-Bu proje [ISC](LICENSE) lisansı altında lisanslanmıştır.

@@ -15,7 +15,7 @@ export const extractProductId = (url: string, platform: 'trendyol' | 'hepsiburad
       const match = url.match(/-p-(\d+)/);
       if (match && match[1]) return match[1];
     } else if (platform === 'hepsiburada') {
-      const match = url.match(/-p-([A-Za-z0-9]+)/);
+      const match = url.match(/-p[m]?-([A-Za-z0-9]+)/);
       if (match && match[1]) return match[1];
     }
     throw new Error("ID bulunamadı");
@@ -154,14 +154,12 @@ export const scrapeHepsiburada = async (url: string): Promise<{
   console.log(`[Scraper] Hepsiburada Puppeteer kazıma işlemi başlıyor (Product ID: ${productId})...`);
 
   try {
-      // Sadece orijinal URL'yi kullan
-      const reviewsUrl = url;
-
-      const rawReviews = await scrapeWithPuppeteer(reviewsUrl, 'hepsiburada');
+      const rawReviews = await scrapeWithPuppeteer(url, 'hepsiburada');
 
       if (rawReviews.length === 0) {
-        console.log("[Scraper] Hepsiburada Puppeteer yorum bulamadı.");
-        return await fallbackAction(url, 'hepsiburada');
+        console.warn("[Scraper] ⚠️ Hepsiburada yorumları çekilemedi. HB güçlü anti-bot koruması kullanmaktadır. Analiz yorumsuz devam edecek.");
+        // HB anti-bot koruması nedeniyle yorum çekilemezse boş döndür (hata fırlatma)
+        return [];
       }
 
       const formattedReviews = rawReviews.slice(0, 50).map(text => ({
@@ -175,13 +173,11 @@ export const scrapeHepsiburada = async (url: string): Promise<{
 
   } catch (error) {
      console.error("[Scraper] Hepsiburada Kazıma Hatası:", error);
-     return await fallbackAction(url, 'hepsiburada');
+     console.warn("[Scraper] ⚠️ HB yorumları alınamadı, analiz yorumsuz devam edecek.");
+     return []; // Hata fırlatma yerine boş dizi dön
   }
 };
 
-/**
- * Genel kazıma (scraper) wrapper fonksiyonu
- */
 export const scrapeReviews = async (url: string) => {
   if (url.includes("trendyol.com")) {
     return await scrapeTrendyol(url);
@@ -191,3 +187,209 @@ export const scrapeReviews = async (url: string) => {
     throw new AppError("Desteklenmeyen platform. Lütfen Trendyol veya Hepsiburada linki girin.", 400, "INVALID_PLATFORM");
   }
 };
+
+/**
+ * URL'den ürün detaylarını (isim, marka, özellikler vb.) çeker
+ */
+export const scrapeProductDetails = async (url: string): Promise<{
+    name: string;
+    brand: string;
+    category: string;
+    features: Record<string, string>;
+    advantages: string;
+}> => {
+    const isHepsiburada = url.includes('hepsiburada.com');
+    const isTrendyol = url.includes('trendyol.com');
+
+    // --- Hepsiburada: URL-based parsing (HB agresif anti-bot kullandığı için) ---
+    if (isHepsiburada) {
+        console.log(`[Scraper] HB ürün detayları URL'den parse ediliyor: ${url}`);
+        return parseHepsiburadaUrl(url);
+    }
+
+    // --- Trendyol & Diğer siteler: Puppeteer ile kazıma ---
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox', 
+            '--disable-blink-features=AutomationControlled',
+            '--disable-web-security'
+        ]
+    });
+
+    try {
+        const page = await browser.newPage();
+        await page.evaluateOnNewDocument(() => {
+            Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        });
+        await page.setViewport({ width: 1366, height: 768 });
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+        
+        console.log(`[Scraper] Ürün detayları için gidiliyor: ${url}`);
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+        
+        const details = await page.evaluate(() => {
+            // Trendyol için özel JSON State nesnesi kontrolü
+            const windowAny = window as any;
+            if (windowAny.__envoy__SHARED_PROPS && windowAny.__envoy__SHARED_PROPS.product) {
+                const p = windowAny.__envoy__SHARED_PROPS.product;
+                const category = p.category?.hierarchy || p.category?.name || '';
+                
+                const features: Record<string, string> = {};
+                if (p.attributes && Array.isArray(p.attributes)) {
+                    p.attributes.forEach((attr: any) => {
+                        if (attr.key?.name && attr.value?.name) {
+                            features[attr.key.name] = attr.value.name;
+                        }
+                    });
+                }
+                
+                let advantages = '';
+                const descEl = document.querySelector('.detail-desc-list, .product-desc, .item-desc');
+                if (descEl) {
+                    advantages = descEl.textContent?.replace(/\s+/g, ' ').trim() || '';
+                }
+
+                return {
+                    name: p.name || 'Ürün Adı Bulunamadı',
+                    brand: p.brand?.name || 'Marka',
+                    category: category || 'Kategori',
+                    features,
+                    advantages: advantages.slice(0, 1000)
+                };
+            }
+
+            // Diğer siteler için genel DOM scraping
+            const nameEl = document.querySelector('h1') || document.querySelector('.product-name');
+            const name = nameEl ? nameEl.textContent?.trim() : '';
+
+            const brandEl = document.querySelector('.product-brand') || document.querySelector('h1 a');
+            const brand = brandEl ? brandEl.textContent?.trim() : '';
+
+            const breadcrumbs = Array.from(document.querySelectorAll('.breadcrumb-item, .product-detail-breadcrumb a, a[href*="/tum--urunler"]'));
+            const category = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].textContent?.trim() : '';
+
+            let advantages = '';
+            const descEl = document.querySelector('.product-desc, .detail-desc-list, #productDescription');
+            if (descEl) {
+                advantages = descEl.textContent?.replace(/\s+/g, ' ').trim() || '';
+            }
+
+            const features: Record<string, string> = {};
+            document.querySelectorAll('ul.detail-attr-container li, table.data-list tr').forEach(row => {
+               const key = row.querySelector('th, span:first-child')?.textContent?.trim();
+               const val = row.querySelector('td, span:last-child, b')?.textContent?.trim();
+               if (key && val) {
+                 features[key] = val;
+               }
+            });
+
+            return {
+                name: name || 'Ürün Adı Bulunamadı',
+                brand: brand || 'Marka',
+                category: category || 'Kategori',
+                features,
+                advantages: advantages.slice(0, 1000)
+            };
+        });
+
+        return details;
+    } catch (e) {
+        console.error(`[Scraper] Detay çekme hatası:`, e);
+        throw new AppError("Ürün detayları çekilemedi", 500, "SCRAPE_DETAILS_FAILED");
+    } finally {
+        await browser.close();
+    }
+};
+
+/**
+ * Hepsiburada URL slug'ından ürün bilgilerini parse eder.
+ * HB güçlü anti-bot koruması kullandığı için Puppeteer ile kazıma güvenilir değildir.
+ * URL yapısı: /marka-urun-adi-ozellikler-p-SKU
+ */
+function parseHepsiburadaUrl(url: string): {
+    name: string;
+    brand: string;
+    category: string;
+    features: Record<string, string>;
+    advantages: string;
+} {
+    try {
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname; // e.g. /philips-lumea-ipl-9900-serisi-bri950-02-tuy-alma-cihazi-p-HBV000007RZZC
+        
+        // SKU'yu çıkart (HB hem -p- hem -pm- kullanır)
+        const skuMatch = pathname.match(/-p[m]?-([A-Za-z0-9]+)$/);
+        const sku = skuMatch ? skuMatch[1] : '';
+        
+        // Slug'ı al (URL'nin başındaki / ve sondaki -p-SKU veya -pm-SKU'yu çıkart)
+        let slug = pathname.replace(/^\//, '').replace(/-p[m]?-[A-Za-z0-9]+$/, '');
+        
+        // Slug'ı parçalara ayır
+        const parts = slug.split('-');
+        
+        // İlk kelime genellikle marka
+        // Bilinen markalar listesi (yaygın olanlar)
+        const knownBrands = [
+            'apple', 'samsung', 'xiaomi', 'huawei', 'lg', 'sony', 'philips', 'bosch',
+            'siemens', 'arcelik', 'beko', 'vestel', 'asus', 'lenovo', 'hp', 'dell',
+            'dyson', 'karcher', 'tefal', 'moulinex', 'braun', 'oral-b', 'loreal',
+            'nike', 'adidas', 'puma', 'converse', 'skechers', 'casio', 'jbl',
+            'anker', 'baseus', 'oppo', 'realme', 'oneplus', 'nothing', 'google',
+            'microsoft', 'acer', 'msi', 'razer', 'corsair', 'logitech', 'steelseries',
+            'marshall', 'sennheiser', 'bose', 'harman-kardon', 'panasonic', 'toshiba',
+            'grundig', 'altus', 'fakir', 'sinbo', 'rowenta', 'electrolux', 'aeg'
+        ];
+        
+        let brand = '';
+        let nameStartIndex = 0;
+        
+        // İlk 1-2 kelimeyi marka olarak kontrol et
+        if (parts.length > 0) {
+            const firstWord = parts[0].toLowerCase();
+            const firstTwo = parts.length > 1 ? `${parts[0]}-${parts[1]}`.toLowerCase() : '';
+            
+            if (knownBrands.includes(firstTwo)) {
+                brand = `${capitalize(parts[0])} ${capitalize(parts[1])}`;
+                nameStartIndex = 2;
+            } else if (knownBrands.includes(firstWord)) {
+                brand = capitalize(parts[0]);
+                nameStartIndex = 1;
+            } else {
+                // Bilinmeyen marka, yine ilk kelimeyi marka olarak al
+                brand = capitalize(parts[0]);
+                nameStartIndex = 1;
+            }
+        }
+        
+        // Ürün adını oluştur (tüm kalan parçalar)
+        const nameParts = parts.slice(nameStartIndex).map(p => capitalize(p));
+        const name = `${brand} ${nameParts.join(' ')}`.trim();
+        
+        console.log(`[Scraper] HB URL parse sonucu - İsim: "${name}", Marka: "${brand}"`);
+        
+        return {
+            name,
+            brand,
+            category: '', // URL'den kategori çıkarılamaz, kullanıcı manuel girecek
+            features: {},
+            advantages: '' // URL'den açıklama çıkarılamaz, kullanıcı manuel girecek
+        };
+    } catch (e) {
+        console.error(`[Scraper] HB URL parse hatası:`, e);
+        return {
+            name: 'Ürün Adı Bulunamadı',
+            brand: '',
+            category: '',
+            features: {},
+            advantages: ''
+        };
+    }
+}
+
+function capitalize(str: string): string {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+

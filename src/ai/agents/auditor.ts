@@ -21,12 +21,16 @@ export const auditorAgent = async (state: AnalysisStateType): Promise<Partial<An
 
   const structuredLlm = llm.withStructuredOutput(auditorSchema, { name: "risk_auditor_report" });
 
+  const ownReviewsText = state.ownReviews && state.ownReviews.length > 0 
+    ? state.ownReviews.map(r => `Puan: ${r.rating || "?"}/5 - Yorum: ${r.comment}`).join("\n\n")
+    : "Kendi ürün yorumu bulunmuyor.";
+
   const systemPrompt = `
 Sen "İnce Ayar" platformunun Risk Denetçi (Risk Auditor) ajansın.
-Görev: Yazar ajanın hazırladığı taslak metni ve satıcının yüklediği ürün fotoğraflarını inceleyerek,
-metinde vadedilenlerle fotoğraftaki ürünün birbiriyle uyuşup uyuşmadığını denetlemek.
-Eğer metin "çok parlak" diyorsa ama görsel mat duruyorsa, bu bir iade riskidir.
-Metin ve fotoğraflar arasındaki tutarsızlıkları bul, her biri için risk skoru belirle ve detaylıca listele.
+Görev: Yazar ajanın hazırladığı taslak metni, satıcının yüklediği ürün fotoğraflarını ve (varsa) bizim kendi ürünümüzün yorumlarını inceleyerek iade risk analizi yapmak.
+
+**Kritik Kontrol 1 (Görsel Uyumsuzluk):** Eğer metin "çok parlak" diyorsa ama görsel mat duruyorsa, bu bir iade riskidir.
+**Kritik Kontrol 2 (Bumerang Etkisi):** Eğer taslak metin rakibe bir konuda (örn. şarj süresi) yükleniyorsa ama bizim KENDİ ürün yorumlarımızda da aynı konudan şikayet edilmişse, bu büyük bir yalan/risk yaratır! Bu durumu tespit edersen "Kritik Risk" olarak raporla.
 
 Taslak Metin:
 ${state.draftDescription}
@@ -36,6 +40,9 @@ ${state.draftDescription}
 Kategori: ${state.product.category}
 Marka: ${state.product.brand}
 Avantajlar: ${state.product.advantages}
+
+Kendi Ürün Yorumlarımız:
+${ownReviewsText}
   `;
 
   // Multimodal mesaj oluştur

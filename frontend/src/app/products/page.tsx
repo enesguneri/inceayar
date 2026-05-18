@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { productApi, Product } from '@/lib/services';
 import { Button } from '@/components/ui/Button';
-import { Package, Plus, Pencil, Trash2, ArrowRight, Search } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, ArrowRight, Search, Target } from 'lucide-react';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);

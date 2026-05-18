@@ -295,9 +295,23 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
  */
 async function runLanggraphProcess(analysisId: string, product: any, competitorReviews: any[]) {
   try {
+    let ownReviews: any[] = [];
+    
+    // Asıl ürünün linki varsa, kendi yorumlarını da çekelim
+    if (product.url) {
+      try {
+        const { scrapeReviews } = await import("../services/scraper");
+        ownReviews = await scrapeReviews(product.url);
+        console.log(`[Analysis] Asıl ürünün ${ownReviews.length} kendi yorumu çekildi.`);
+      } catch (err) {
+        console.warn(`[Analysis] Asıl ürün yorumları çekilemedi (URL: ${product.url}). Analiz asıl yorumlar olmadan devam edecek.`);
+      }
+    }
+
     const initialState = {
       product: product.toObject(),
       competitorReviews,
+      ownReviews,
       analysisId,
       currentAgent: "researcher"
     };

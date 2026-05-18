@@ -28,6 +28,7 @@ const productSchema = z.object({
     features: z.record(z.string(), z.string()).optional(),
     advantages: z.string().optional(),
     images: z.array(z.string()).max(5, "Maksimum 5 fotoğraf yüklenebilir").optional(),
+    url: z.string().url().optional(),
   }),
 });
 
@@ -39,10 +40,33 @@ const updateProductSchema = z.object({
     features: z.record(z.string(), z.string()).optional(),
     advantages: z.string().optional(),
     images: z.array(z.string()).max(5).optional(),
+    url: z.string().url().optional(),
+  }),
+});
+
+const scrapeProductSchema = z.object({
+  body: z.object({
+    url: z.string().url("Geçerli bir Trendyol/Hepsiburada linki girin"),
   }),
 });
 
 // Endpoint'ler
+
+router.post(
+  "/scrape-details",
+  validate(scrapeProductSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { url } = req.body;
+      const { scrapeProductDetails } = await import("../services/scraper");
+      const details = await scrapeProductDetails(url);
+      sendSuccess(res, details);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 router.post(
   "/",
   validate(productSchema),
