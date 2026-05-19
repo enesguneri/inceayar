@@ -9,9 +9,9 @@ if (process.env.NODE_ENV === "test") {
 } else {
   // Render'ın varsayılan Secret File konumu (/etc/secrets/.env) kontrol edilir
   if (fs.existsSync("/etc/secrets/.env")) {
-    dotenv.config({ path: "/etc/secrets/.env", override: true });
+    dotenv.config({ path: "/etc/secrets/.env", override: false });
   } else {
-    dotenv.config({ override: true });
+    dotenv.config({ override: false });
   }
 }
 
