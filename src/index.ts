@@ -32,6 +32,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", generalLimiter);
 
 // ─── Health Check (Render cold start çözümü için) ───
+app.get("/", (_req, res) => {
+  res.status(200).json({ status: "ok", message: "İnceAyar Backend API is running" });
+});
+
 app.get("/api/health", (_req, res) => {
   sendSuccess(res, {
     status: "ok",
