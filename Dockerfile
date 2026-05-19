@@ -4,6 +4,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 COPY package*.json ./
 COPY tsconfig.json ./
@@ -40,6 +41,7 @@ RUN apt-get update && apt-get install -y wget gnupg \
 
 # Set Puppeteer environment variable to use the installed Google Chrome
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
 COPY package*.json ./
