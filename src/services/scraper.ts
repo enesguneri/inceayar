@@ -53,8 +53,19 @@ const scrapeWithPuppeteer = async (url: string, platform: 'trendyol' | 'hepsibur
         await page.setViewport({ width: 1366, height: 768 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         
+        // Request interception ile ağır görsel, font ve medyaları engelle
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const type = req.resourceType();
+            if (['image', 'font', 'media'].includes(type)) {
+                req.abort();
+            } else {
+                req.continue();
+            }
+        });
+
         console.log(`[Scraper] Sayfaya gidiliyor: ${url}`);
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
         // Daha fazla yorum yüklemek için sayfayı 10 kez aşağı kaydırıyoruz
         for (let i = 0; i < 10; i++) {
@@ -132,15 +143,26 @@ export const scrapeTrendyol = async (url: string): Promise<{
         await page.setViewport({ width: 1366, height: 768 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         
+        // Request interception ile ağır görsel, font ve medyaları engelle
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const type = req.resourceType();
+            if (['image', 'font', 'media'].includes(type)) {
+                req.abort();
+            } else {
+                req.continue();
+            }
+        });
+
         // Trendyol Yorumlar sayfasına git
         const reviewsUrl = url.includes('/yorumlar') ? url : `${url.split('?')[0]}/yorumlar`;
         console.log(`[Scraper] Sayfaya gidiliyor: ${reviewsUrl}`);
         
-        const response = await page.goto(reviewsUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+        const response = await page.goto(reviewsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
         if (response?.status() === 404) {
              console.log("[Scraper] /yorumlar sayfası 404 verdi. Ana sayfadan denenecek...");
-             await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
         }
 
         // Daha fazla yorum yüklemek için sayfayı aşağı kaydır
@@ -303,6 +325,18 @@ export const scrapeProductDetails = async (url: string): Promise<{
 
     try {
         const page = await browser.newPage();
+        
+        // Request interception ile ağır görsel, font ve medyaları engelle
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const type = req.resourceType();
+            if (['image', 'font', 'media'].includes(type)) {
+                req.abort();
+            } else {
+                req.continue();
+            }
+        });
+
         await page.evaluateOnNewDocument(() => {
             Object.defineProperty(navigator, 'webdriver', { get: () => false });
         });
@@ -310,7 +344,7 @@ export const scrapeProductDetails = async (url: string): Promise<{
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
         
         console.log(`[Scraper] Ürün detayları için gidiliyor: ${url}`);
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
         const details = await page.evaluate(() => {
             type PageElement = {
