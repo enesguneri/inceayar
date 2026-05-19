@@ -78,7 +78,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
           </button>
           
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 glass-dark border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
+            <div className="fixed inset-x-4 top-[70px] md:absolute md:inset-x-auto md:right-0 md:top-auto md:mt-2 md:w-80 glass-dark border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
               <div className="p-3 border-b border-white/5 flex items-center justify-between bg-white/5">
                 <h3 className="text-sm font-semibold text-white">Bildirimler</h3>
                 <span className="text-xs text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-full">
