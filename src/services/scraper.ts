@@ -7,6 +7,39 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 puppeteer.use(StealthPlugin());
 
 /**
+ * Yönlendirilmiş (Redirect) kısa URL'leri çözümler (Örn: ty.gl)
+ */
+export const resolveRedirectUrl = async (url: string): Promise<string> => {
+  if (url.includes('ty.gl') || !url.includes('trendyol.com') && !url.includes('hepsiburada.com')) {
+    try {
+      const response = await fetch(url, {
+        method: "HEAD",
+        redirect: "follow",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+      });
+      return response.url || url;
+    } catch (err) {
+      console.warn(`[Scraper] URL yönlendirme çözme başarısız oldu (HEAD denendi):`, err);
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          redirect: "follow",
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          }
+        });
+        return response.url || url;
+      } catch (error) {
+        console.error(`[Scraper] URL yönlendirme çözme tamamen başarısız oldu:`, error);
+      }
+    }
+  }
+  return url;
+};
+
+/**
  * URL'den ürün ID'sini çıkarır
  */
 export const extractProductId = (url: string, platform: 'trendyol' | 'hepsiburada'): string => {
@@ -283,10 +316,11 @@ export const scrapeHepsiburada = async (url: string): Promise<{
 };
 
 export const scrapeReviews = async (url: string) => {
-  if (url.includes("trendyol.com")) {
-    return await scrapeTrendyol(url);
-  } else if (url.includes("hepsiburada.com")) {
-    return await scrapeHepsiburada(url);
+  const resolvedUrl = await resolveRedirectUrl(url);
+  if (resolvedUrl.includes("trendyol.com")) {
+    return await scrapeTrendyol(resolvedUrl);
+  } else if (resolvedUrl.includes("hepsiburada.com")) {
+    return await scrapeHepsiburada(resolvedUrl);
   } else {
     throw new AppError("Desteklenmeyen platform. Lütfen Trendyol veya Hepsiburada linki girin.", 400, "INVALID_PLATFORM");
   }
@@ -303,13 +337,14 @@ export const scrapeProductDetails = async (url: string): Promise<{
     advantages: string;
     images: string[];
 }> => {
-    const isHepsiburada = url.includes('hepsiburada.com');
-    const isTrendyol = url.includes('trendyol.com');
+    const resolvedUrl = await resolveRedirectUrl(url);
+    const isHepsiburada = resolvedUrl.includes('hepsiburada.com');
+    const isTrendyol = resolvedUrl.includes('trendyol.com');
 
     // --- Hepsiburada: URL-based parsing (HB agresif anti-bot kullandığı için) ---
     if (isHepsiburada) {
-        console.log(`[Scraper] HB ürün detayları URL'den parse ediliyor: ${url}`);
-        return parseHepsiburadaUrl(url);
+        console.log(`[Scraper] HB ürün detayları URL'den parse ediliyor: ${resolvedUrl}`);
+        return parseHepsiburadaUrl(resolvedUrl);
     }
 
     // --- Trendyol & Diğer siteler: Puppeteer ile kazıma ---
@@ -343,8 +378,8 @@ export const scrapeProductDetails = async (url: string): Promise<{
         await page.setViewport({ width: 1366, height: 768 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
         
-        console.log(`[Scraper] Ürün detayları için gidiliyor: ${url}`);
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        console.log(`[Scraper] Ürün detayları için gidiliyor: ${resolvedUrl}`);
+        await page.goto(resolvedUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
         const details = await page.evaluate(() => {
             type PageElement = {
