@@ -59,7 +59,8 @@ const scrapeWithPuppeteer = async (url: string, platform: 'trendyol' | 'hepsibur
         // Daha fazla yorum yüklemek için sayfayı 10 kez aşağı kaydırıyoruz
         for (let i = 0; i < 10; i++) {
             await page.evaluate(() => {
-                window.scrollBy(0, 1500);
+                const pageWindow = globalThis as unknown as { scrollBy: (x: number, y: number) => void };
+                pageWindow.scrollBy(0, 1500);
             });
             await new Promise(r => setTimeout(r, 1000));
         }
@@ -116,27 +117,108 @@ export const scrapeTrendyol = async (url: string): Promise<{
     const productId = extractProductId(url, 'trendyol');
     console.log(`[Scraper] Trendyol Puppeteer kazıma işlemi başlıyor (Product ID: ${productId})...`);
 
-    try {
-        // Sadece orijinal URL'yi kullan, çünkü /yorumlar 404'e düşebiliyor
-        const reviewsUrl = url;
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox', 
+            '--disable-blink-features=AutomationControlled',
+            '--disable-web-security'
+        ]
+    });
 
-        const rawReviews = await scrapeWithPuppeteer(reviewsUrl, 'trendyol');
+    try {
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1366, height: 768 });
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        // Trendyol Yorumlar sayfasına git
+        const reviewsUrl = url.includes('/yorumlar') ? url : `${url.split('?')[0]}/yorumlar`;
+        console.log(`[Scraper] Sayfaya gidiliyor: ${reviewsUrl}`);
+        
+        const response = await page.goto(reviewsUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+        
+        if (response?.status() === 404) {
+             console.log("[Scraper] /yorumlar sayfası 404 verdi. Ana sayfadan denenecek...");
+             await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+        }
+
+        // Daha fazla yorum yüklemek için sayfayı aşağı kaydır
+        for (let i = 0; i < 15; i++) {
+            await page.evaluate(() => {
+                const pageWindow = globalThis as unknown as { scrollBy: (x: number, y: number) => void };
+                pageWindow.scrollBy(0, 1500);
+            });
+            await new Promise(r => setTimeout(r, 1000));
+        }
+
+        const rawReviews = await page.evaluate(`(() => {
+            const reviews = [];
+            
+            // Yorum bloklarını seç (.review-comment kapsayıcısı vb.)
+            const reviewElements = Array.from(document.querySelectorAll('.review-comment, .comment-comment, .rnr-com-w'));
+            
+            for (const el of reviewElements) {
+                // Metin için en derindeki p veya span'i hedef al, yoksa direkt kendisini kullan
+                const textEl = el.querySelector('p') || el.querySelector('span') || el;
+                let text = (textEl.textContent || "").trim();
+                
+                // Yıldız değerlendirmesini bul (.star-w .full genişliğinden oranla)
+                let rating = 5; // Default 5 yıldız
+                // Yorum bloğunun üst elemanında yıldız arayalım
+                const parentReview = el.closest('.review') || el.parentElement;
+                const starEl = parentReview ? parentReview.querySelector('.star-w .full') : null;
+                if (starEl) {
+                    const widthStyle = starEl.style.maxWidth || starEl.style.width;
+                    if (widthStyle) {
+                        const percent = parseInt(widthStyle.replace('%', ''), 10);
+                        if (!isNaN(percent)) {
+                            rating = Math.round(percent / 20); // 100% -> 5, 80% -> 4 vs.
+                        }
+                    }
+                }
+
+                if (text && text.length > 20 && text.length < 1000) {
+                     const lowerText = text.toLowerCase();
+                     const isUI = lowerText.includes("tüm yorumlar") || 
+                                  lowerText.includes("sırala") || 
+                                  lowerText.includes("farklı ürüne ait olan");
+                     if (!isUI) {
+                         // "Devamını Oku" metnini temizle
+                         text = text.replace(/Devamını\\s*Oku/gi, '').trim();
+                         reviews.push({ comment: text, rating: rating });
+                     }
+                }
+            }
+            return reviews;
+        })()`) as { comment: string; rating: number }[];
+
+        await browser.close();
 
         if (rawReviews.length === 0) {
              console.log("[Scraper] Trendyol Puppeteer yorum bulamadı.");
              return await fallbackAction(url, 'trendyol');
         }
 
-        const formattedReviews = rawReviews.slice(0, 50).map(text => ({
-             rating: 5, // Rating'i tam parse etmek zor olabilir, varsayılan 5 veriyoruz
-             comment: text,
-             source: 'trendyol' as const
-        }));
+        // Remove duplicates
+        const uniqueComments = new Set<string>();
+        const uniqueReviews = [];
+        for (const r of rawReviews) {
+            if (!uniqueComments.has(r.comment)) {
+                uniqueComments.add(r.comment);
+                uniqueReviews.push({
+                    rating: r.rating || 5, // Rating çıkarılamazsa 5 varsayalım
+                    comment: r.comment,
+                    source: 'trendyol' as const
+                });
+            }
+        }
 
-        console.log(`[Scraper] Trendyol üzerinden ${formattedReviews.length} yorum başarıyla çekildi.`);
-        return formattedReviews;
+        console.log(`[Scraper] Trendyol üzerinden ${uniqueReviews.length} eşsiz yorum başarıyla çekildi.`);
+        return uniqueReviews.slice(0, 50);
 
     } catch (error: any) {
+        await browser.close().catch(() => {});
         console.error("[Scraper] Trendyol Kazıma Hatası:", error);
         return await fallbackAction(url, 'trendyol');
     }
@@ -197,6 +279,7 @@ export const scrapeProductDetails = async (url: string): Promise<{
     category: string;
     features: Record<string, string>;
     advantages: string;
+    images: string[];
 }> => {
     const isHepsiburada = url.includes('hepsiburada.com');
     const isTrendyol = url.includes('trendyol.com');
@@ -230,10 +313,29 @@ export const scrapeProductDetails = async (url: string): Promise<{
         await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
         
         const details = await page.evaluate(() => {
+            type PageElement = {
+                textContent: string | null;
+                getAttribute: (name: string) => string | null;
+                querySelector: (selector: string) => PageElement | null;
+            };
+            type PageDocument = {
+                querySelector: (selector: string) => PageElement | null;
+                querySelectorAll: (selector: string) => Iterable<PageElement>;
+            };
+
+            const pageWindow = globalThis as unknown as {
+                __envoy__SHARED_PROPS?: { product?: any };
+            };
+            const pageDocument = (globalThis as unknown as { document: PageDocument }).document;
+            const normalizeImageUrl = (value: unknown): string => {
+                if (typeof value !== 'string' || !value) return '';
+                if (value.startsWith('//')) return `https:${value}`;
+                if (value.startsWith('http://') || value.startsWith('https://')) return value;
+                return '';
+            };
             // Trendyol için özel JSON State nesnesi kontrolü
-            const windowAny = window as any;
-            if (windowAny.__envoy__SHARED_PROPS && windowAny.__envoy__SHARED_PROPS.product) {
-                const p = windowAny.__envoy__SHARED_PROPS.product;
+            if (pageWindow.__envoy__SHARED_PROPS?.product) {
+                const p = pageWindow.__envoy__SHARED_PROPS.product;
                 const category = p.category?.hierarchy || p.category?.name || '';
                 
                 const features: Record<string, string> = {};
@@ -246,38 +348,57 @@ export const scrapeProductDetails = async (url: string): Promise<{
                 }
                 
                 let advantages = '';
-                const descEl = document.querySelector('.detail-desc-list, .product-desc, .item-desc');
+                const descEl = pageDocument.querySelector('.detail-desc-list, .product-desc, .item-desc');
                 if (descEl) {
                     advantages = descEl.textContent?.replace(/\s+/g, ' ').trim() || '';
                 }
+
+                const images = Array.isArray(p.images)
+                    ? Array.from(new Set(
+                        p.images
+                            .map((image: any) => normalizeImageUrl(image?.url || image?.secureUrl || image))
+                            .filter((imageUrl: string) => Boolean(imageUrl))
+                      )).slice(0, 5)
+                    : [];
 
                 return {
                     name: p.name || 'Ürün Adı Bulunamadı',
                     brand: p.brand?.name || 'Marka',
                     category: category || 'Kategori',
                     features,
-                    advantages: advantages.slice(0, 1000)
+                    advantages: advantages.slice(0, 1000),
+                    images
                 };
             }
 
             // Diğer siteler için genel DOM scraping
-            const nameEl = document.querySelector('h1') || document.querySelector('.product-name');
+            const nameEl = pageDocument.querySelector('h1') || pageDocument.querySelector('.product-name');
             const name = nameEl ? nameEl.textContent?.trim() : '';
 
-            const brandEl = document.querySelector('.product-brand') || document.querySelector('h1 a');
+            const brandEl = pageDocument.querySelector('.product-brand') || pageDocument.querySelector('h1 a');
             const brand = brandEl ? brandEl.textContent?.trim() : '';
 
-            const breadcrumbs = Array.from(document.querySelectorAll('.breadcrumb-item, .product-detail-breadcrumb a, a[href*="/tum--urunler"]'));
-            const category = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].textContent?.trim() : '';
+            const breadcrumbs = Array.from(pageDocument.querySelectorAll('.breadcrumb-item, .product-detail-breadcrumb a, a[href*="/tum--urunler"]'));
+            const category = breadcrumbs.at(-1)?.textContent?.trim() || '';
 
             let advantages = '';
-            const descEl = document.querySelector('.product-desc, .detail-desc-list, #productDescription');
+            const descEl = pageDocument.querySelector('.product-desc, .detail-desc-list, #productDescription');
             if (descEl) {
                 advantages = descEl.textContent?.replace(/\s+/g, ' ').trim() || '';
             }
 
+            const imageCandidates = [
+                pageDocument.querySelector('meta[property="og:image"]')?.getAttribute('content') || '',
+                ...Array.from(pageDocument.querySelectorAll('img')).map((img) => img.getAttribute('src') || ''),
+            ];
+            const images = Array.from(new Set(
+                imageCandidates
+                    .map(normalizeImageUrl)
+                    .filter((imageUrl): imageUrl is string => Boolean(imageUrl) && !imageUrl.includes('logo') && !imageUrl.includes('sprite'))
+            )).slice(0, 5);
+
             const features: Record<string, string> = {};
-            document.querySelectorAll('ul.detail-attr-container li, table.data-list tr').forEach(row => {
+            Array.from(pageDocument.querySelectorAll('ul.detail-attr-container li, table.data-list tr')).forEach(row => {
                const key = row.querySelector('th, span:first-child')?.textContent?.trim();
                const val = row.querySelector('td, span:last-child, b')?.textContent?.trim();
                if (key && val) {
@@ -290,9 +411,17 @@ export const scrapeProductDetails = async (url: string): Promise<{
                 brand: brand || 'Marka',
                 category: category || 'Kategori',
                 features,
-                advantages: advantages.slice(0, 1000)
+                advantages: advantages.slice(0, 1000),
+                images
             };
-        });
+        }) as {
+            name: string;
+            brand: string;
+            category: string;
+            features: Record<string, string>;
+            advantages: string;
+            images: string[];
+        };
 
         return details;
     } catch (e) {
@@ -314,6 +443,7 @@ function parseHepsiburadaUrl(url: string): {
     category: string;
     features: Record<string, string>;
     advantages: string;
+    images: string[];
 } {
     try {
         const urlObj = new URL(url);
@@ -347,18 +477,20 @@ function parseHepsiburadaUrl(url: string): {
         
         // İlk 1-2 kelimeyi marka olarak kontrol et
         if (parts.length > 0) {
-            const firstWord = parts[0].toLowerCase();
-            const firstTwo = parts.length > 1 ? `${parts[0]}-${parts[1]}`.toLowerCase() : '';
+            const firstPart = parts[0] ?? '';
+            const secondPart = parts[1] ?? '';
+            const firstWord = firstPart.toLowerCase();
+            const firstTwo = secondPart ? `${firstPart}-${secondPart}`.toLowerCase() : '';
             
             if (knownBrands.includes(firstTwo)) {
-                brand = `${capitalize(parts[0])} ${capitalize(parts[1])}`;
+                brand = `${capitalize(firstPart)} ${capitalize(secondPart)}`;
                 nameStartIndex = 2;
             } else if (knownBrands.includes(firstWord)) {
-                brand = capitalize(parts[0]);
+                brand = capitalize(firstPart);
                 nameStartIndex = 1;
             } else {
                 // Bilinmeyen marka, yine ilk kelimeyi marka olarak al
-                brand = capitalize(parts[0]);
+                brand = capitalize(firstPart);
                 nameStartIndex = 1;
             }
         }
@@ -374,7 +506,8 @@ function parseHepsiburadaUrl(url: string): {
             brand,
             category: '', // URL'den kategori çıkarılamaz, kullanıcı manuel girecek
             features: {},
-            advantages: '' // URL'den açıklama çıkarılamaz, kullanıcı manuel girecek
+            advantages: '', // URL'den açıklama çıkarılamaz, kullanıcı manuel girecek
+            images: []
         };
     } catch (e) {
         console.error(`[Scraper] HB URL parse hatası:`, e);
@@ -383,7 +516,8 @@ function parseHepsiburadaUrl(url: string): {
             brand: '',
             category: '',
             features: {},
-            advantages: ''
+            advantages: '',
+            images: []
         };
     }
 }
@@ -392,4 +526,3 @@ function capitalize(str: string): string {
     if (!str) return '';
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
-

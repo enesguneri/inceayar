@@ -43,6 +43,10 @@ export const AnalysisState = Annotation.Root({
     reducer: (x, y) => y ?? x,
     default: () => [],
   }),
+  generatedAdvantages: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
   riskReport: Annotation<RiskReport | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,

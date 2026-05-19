@@ -1,11 +1,43 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Bell, Search, User, LogOut } from 'lucide-react';
+import { Bell, Search, LogOut, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { analysisApi, Analysis } from '@/lib/services';
+import Link from 'next/link';
 
 export const Header = () => {
   const { user, logout } = useAuthStore();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [completedAnalyses, setCompletedAnalyses] = useState<Analysis[]>([]);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchAnalyses = async () => {
+      if (!user) return;
+      try {
+        const res = await analysisApi.getAll(1, 10);
+        const analyses = res.data?.data?.analyses || [];
+        setCompletedAnalyses(analyses.filter(a => a.status === 'completed'));
+      } catch (e) {
+        console.error('Failed to fetch analyses for notifications', e);
+      }
+    };
+    
+    fetchAnalyses();
+    const interval = setInterval(fetchAnalyses, 30000); // Poll every 30s
+    return () => clearInterval(interval);
+  }, [user]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 w-full glass-dark border-b-0 border-white/5 py-3 px-6 flex items-center justify-between">
@@ -21,10 +53,58 @@ export const Header = () => {
       </div>
       
       <div className="flex items-center gap-4">
-        <button className="relative p-2 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-white/5">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full border border-slate-900"></span>
-        </button>
+        <div className="relative" ref={dropdownRef}>
+          <button 
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="relative p-2 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-white/5"
+          >
+            <Bell className="w-5 h-5" />
+            {completedAnalyses.length > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full border border-slate-900"></span>
+            )}
+          </button>
+          
+          {showNotifications && (
+            <div className="absolute right-0 mt-2 w-80 glass-dark border border-white/10 rounded-xl shadow-xl overflow-hidden z-50">
+              <div className="p-3 border-b border-white/5 flex items-center justify-between bg-white/5">
+                <h3 className="text-sm font-semibold text-white">Bildirimler</h3>
+                <span className="text-xs text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-full">
+                  {completedAnalyses.length} Yeni
+                </span>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                {completedAnalyses.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-slate-400">
+                    Yeni bildiriminiz yok.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/5">
+                    {completedAnalyses.map(analysis => (
+                      <Link 
+                        key={analysis._id} 
+                        href={`/analyses/${analysis._id}`}
+                        onClick={() => setShowNotifications(false)}
+                        className="flex items-start gap-3 p-3 hover:bg-white/5 transition-colors group"
+                      >
+                        <div className="p-1.5 rounded-full bg-emerald-500/10 text-emerald-400 mt-0.5">
+                          <CheckCircle className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white group-hover:text-brand-300 transition-colors">
+                            Analiz Tamamlandı
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            #{analysis._id.slice(-6).toUpperCase()} numaralı analiz işlemini bitirdi.
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         
         <div className="h-6 w-px bg-dark-border mx-2"></div>
         

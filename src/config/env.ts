@@ -2,7 +2,11 @@ import dotenv from "dotenv";
 import { z } from "zod";
 
 // .env dosyasını yükle
-dotenv.config({ override: true });
+if (process.env.NODE_ENV === "test") {
+  dotenv.config({ path: ".env.test", override: true });
+} else {
+  dotenv.config({ override: true });
+}
 
 /**
  * Ortam değişkenleri şeması.

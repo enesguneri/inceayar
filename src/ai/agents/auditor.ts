@@ -4,6 +4,21 @@ import { AnalysisStateType } from "../state";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { withRetry } from "../../utils/retry";
 
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    return `data:${contentType};base64,${base64}`;
+  } catch (e) {
+    console.error("Failed to fetch image:", url, e);
+    return null;
+  }
+}
+
 const auditorSchema = z.object({
   riskReport: z.object({
     overallScore: z.number().min(0).max(100).describe("Ürün görselleri ve açıklamasının uyuşma/ikna edicilik skoru (0=Çok Riskli, 100=Mükemmel)"),
@@ -52,12 +67,15 @@ ${ownReviewsText}
 
   // Görseller varsa ekle
   if (state.product.images && state.product.images.length > 0) {
-    state.product.images.forEach((imageUrl) => {
-      contentParams.push({
-        type: "image_url",
-        image_url: { url: imageUrl }
-      });
-    });
+    for (const imageUrl of state.product.images) {
+      const base64Url = await fetchImageAsBase64(imageUrl);
+      if (base64Url) {
+        contentParams.push({
+          type: "image_url",
+          image_url: { url: base64Url }
+        });
+      }
+    }
   } else {
     contentParams.push({ type: "text", text: "(Not: Ürüne ait görsel bulunamadı, sadece metni mantıksal ve tutarlılık açısından analiz et.)" });
   }

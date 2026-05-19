@@ -108,7 +108,7 @@ export default function ProductsPage() {
                 )}
                 {/* Actions overlay */}
                 <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <Link href={`/products/${product._id}/edit`} className="p-2 bg-slate-900/80 backdrop-blur-sm rounded-lg text-slate-300 hover:text-white transition-colors">
+                  <Link href={`/products/${product._id}?edit=1`} className="p-2 bg-slate-900/80 backdrop-blur-sm rounded-lg text-slate-300 hover:text-white transition-colors">
                     <Pencil className="w-4 h-4" />
                   </Link>
                   <button

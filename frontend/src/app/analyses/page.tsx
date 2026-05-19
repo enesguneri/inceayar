@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { analysisApi, Analysis } from '@/lib/services';
-import { Target, Loader, CheckCircle, XCircle, Plus, ArrowRight } from 'lucide-react';
+import { Target, Loader, CheckCircle, XCircle, Plus, ArrowRight, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 const StatusBadge = ({ status }: { status: string }) => {
   const map: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -24,21 +25,39 @@ export default function AnalysesListPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [status, setStatus] = useState('all');
 
-  const fetchAnalyses = async (p = 1) => {
-    setLoading(true);
-    try {
-      const res = await analysisApi.getAll(p, 10);
-      setAnalyses(res.data?.data?.analyses ?? []);
-      setTotalPages(res.data?.data?.pagination?.totalPages ?? 1);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1); // Reset page on search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  useEffect(() => { fetchAnalyses(page); }, [page]);
+  useEffect(() => {
+    let ignore = false;
+
+    Promise.resolve().then(async () => {
+      setLoading(true);
+      try {
+        const res = await analysisApi.getAll(page, 10, debouncedSearch, status);
+        if (ignore) return;
+        setAnalyses(res.data?.data?.analyses ?? []);
+        setTotalPages(res.data?.data?.pagination?.totalPages ?? 1);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, [page, debouncedSearch, status]);
 
   return (
     <div className="space-y-6">
@@ -53,6 +72,31 @@ export default function AnalysesListPage() {
             Yeni Analiz
           </Button>
         </Link>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input 
+            placeholder="Analiz ID veya Ürün Adı Ara..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="relative">
+          <select 
+            className="appearance-none bg-dark-bg/50 border border-dark-border text-sm text-white rounded-xl pl-4 pr-10 py-2.5 focus:outline-none focus:border-brand-500 transition-colors"
+            value={status}
+            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          >
+            <option value="all">Tüm Durumlar</option>
+            <option value="completed">Tamamlananlar</option>
+            <option value="processing">İşlenenler</option>
+            <option value="failed">Başarısız Olanlar</option>
+          </select>
+          <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        </div>
       </div>
 
       {loading ? (

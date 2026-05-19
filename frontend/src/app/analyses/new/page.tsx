@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { productApi, analysisApi, Product } from '@/lib/services';
+import { getApiErrorMessage } from '@/lib/errors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { ArrowLeft, Link as LinkIcon, Target, Package, ChevronDown, Clock } from 'lucide-react';
+import { ArrowLeft, Link as LinkIcon, Target, Package, Clock } from 'lucide-react';
 
 export default function NewAnalysisPage() {
   const router = useRouter();
@@ -38,8 +39,8 @@ export default function NewAnalysisPage() {
       if (analysisId) {
         router.push(`/analyses/${analysisId}`);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Analiz başlatılırken bir hata oluştu.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Analiz başlatılırken bir hata oluştu.'));
     } finally {
       setLoading(false);
     }

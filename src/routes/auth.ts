@@ -14,7 +14,7 @@ const registerSchema = z.object({
     name: z.string().min(2, "İsim en az 2 karakter olmalıdır"),
     email: z.string().email("Geçerli bir email adresi giriniz"),
     password: z.string().min(6, "Şifre en az 6 karakter olmalıdır"),
-    company: z.string().optional(),
+    company: z.string().min(2, "İşletme adı en az 2 karakter olmalıdır"),
   }),
 });
 

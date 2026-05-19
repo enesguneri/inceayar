@@ -14,7 +14,7 @@ export interface IProduct extends Document {
 }
 
 const ProductSchema: Schema = new Schema({
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     name: { type: String, required: true },
     category: { type: String, required: true },
     brand: { type: String, required: true },

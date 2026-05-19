@@ -102,7 +102,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
     const productId = req.params.id as string;
-    
+
     const product = await getProductById(userId, productId);
     sendSuccess(res, product);
   } catch (error) {
@@ -152,7 +152,7 @@ router.post(
       }
 
       const files = req.files as Express.Multer.File[];
-      const uploadPromises = files.map((file) => 
+      const uploadPromises = files.map((file) =>
         uploadToCloudinary(file.buffer, `inceayar/products/${productId}`)
       );
 
@@ -160,7 +160,7 @@ router.post(
       const imageUrls = uploadResults.map((result) => result.url);
 
       const product = await updateProductImages(userId, productId, imageUrls);
-      
+
       sendSuccess(res, product);
     } catch (error) {
       next(error);

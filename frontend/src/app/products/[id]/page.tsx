@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { productApi, analysisApi, Product, Analysis } from '@/lib/services';
 import { Button } from '@/components/ui/Button';
@@ -27,6 +27,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
@@ -35,22 +36,27 @@ export default function ProductDetailPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', brand: '', category: '', advantages: '' });
+  const [editForm, setEditForm] = useState({ name: '', brand: '', category: '', advantages: '', url: '' });
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
         const [pRes, aRes] = await Promise.all([
           productApi.getById(id),
-          analysisApi.getAll(1, 50),
+          analysisApi.getAll(1, 50, undefined, undefined, id),
         ]);
         const p: Product = pRes.data?.data;
         setProduct(p);
-        setEditForm({ name: p.name, brand: p.brand, category: p.category, advantages: p.advantages || '' });
+        setEditForm({ name: p.name, brand: p.brand, category: p.category, advantages: p.advantages || '', url: p.url || '' });
+        setEditing(searchParams.get('edit') === '1');
 
-        // Filter analyses for this product
+        // Filter analyses for this product safely
         const allAnalyses: Analysis[] = aRes.data?.data?.analyses ?? [];
-        setAnalyses(allAnalyses.filter((a: any) => a.productId === id || a.productId?._id === id));
+        setAnalyses(allAnalyses.filter((analysis) => {
+          if (!analysis.productId) return false;
+          const productId = typeof analysis.productId === 'string' ? analysis.productId : (analysis.productId as any)._id;
+          return productId === id;
+        }));
       } catch (e) {
         console.error(e);
       } finally {
@@ -58,7 +64,7 @@ export default function ProductDetailPage() {
       }
     };
     fetchAll();
-  }, [id]);
+  }, [id, searchParams]);
 
   const handleSave = async () => {
     if (!product) return;
@@ -96,6 +102,19 @@ export default function ProductDetailPage() {
       console.error(e);
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = async (imageUrlToRemove: string) => {
+    if (!product) return;
+    if (!confirm('Bu fotoğrafı silmek istediğinize emin misiniz?')) return;
+    
+    try {
+      const updatedImages = product.images.filter(img => img !== imageUrlToRemove);
+      const res = await productApi.update(id, { images: updatedImages });
+      setProduct(res.data?.data);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -159,31 +178,49 @@ export default function ProductDetailPage() {
           {/* Main Image */}
           <div className="glass-dark rounded-2xl border border-white/5 overflow-hidden aspect-square relative group">
             {product.images?.[0] ? (
-              <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+              <>
+                <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
+                <button 
+                  type="button" 
+                  onClick={() => handleRemoveImage(product.images[0])}
+                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all z-10"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </>
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Package className="w-16 h-16 text-slate-600" />
               </div>
             )}
-            <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-              <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
-              {uploadingImage ? (
-                <Loader className="w-8 h-8 text-white animate-spin" />
-              ) : (
-                <div className="text-center text-white">
-                  <Upload className="w-8 h-8 mx-auto mb-2" />
-                  <span className="text-sm font-medium">Fotoğraf Yükle</span>
-                </div>
-              )}
-            </label>
+            {!product.images?.[0] && (
+              <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+                {uploadingImage ? (
+                  <Loader className="w-8 h-8 text-white animate-spin" />
+                ) : (
+                  <div className="text-center text-white">
+                    <Upload className="w-8 h-8 mx-auto mb-2" />
+                    <span className="text-sm font-medium">Fotoğraf Yükle</span>
+                  </div>
+                )}
+              </label>
+            )}
           </div>
 
           {/* Thumbnail grid */}
           {product.images?.length > 1 && (
             <div className="grid grid-cols-4 gap-2">
               {product.images.slice(0, 4).map((img, i) => (
-                <div key={i} className="aspect-square rounded-lg overflow-hidden border border-white/10">
+                <div key={i} className="aspect-square rounded-lg overflow-hidden border border-white/10 relative group">
                   <img src={img} alt="" className="w-full h-full object-cover" />
+                  <button 
+                    type="button" 
+                    onClick={() => handleRemoveImage(img)}
+                    className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -204,6 +241,7 @@ export default function ProductDetailPage() {
             {editing ? (
               <div className="space-y-3">
                 <Input placeholder="Ürün Adı" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} />
+                <Input placeholder="Ürün Linki (Trendyol, vb.)" value={editForm.url} onChange={e => setEditForm(p => ({ ...p, url: e.target.value }))} />
                 <div className="grid grid-cols-2 gap-3">
                   <Input placeholder="Marka" value={editForm.brand} onChange={e => setEditForm(p => ({ ...p, brand: e.target.value }))} />
                   <Input placeholder="Kategori" value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} />
@@ -228,6 +266,14 @@ export default function ProductDetailPage() {
                     <p className="text-white font-medium">{product.category}</p>
                   </div>
                 </div>
+                {product.url && (
+                  <div>
+                    <p className="text-slate-400 text-xs mb-1">Ürün Linki</p>
+                    <a href={product.url} target="_blank" rel="noopener noreferrer" className="text-brand-400 text-sm hover:underline break-all">
+                      {product.url}
+                    </a>
+                  </div>
+                )}
                 {product.advantages && (
                   <div>
                     <p className="text-slate-400 text-xs mb-1">Avantajlar</p>

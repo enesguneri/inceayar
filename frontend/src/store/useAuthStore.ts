@@ -5,6 +5,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  company?: string;
 }
 
 interface AuthState {
@@ -36,9 +37,8 @@ export const useAuthHydration = () => {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    // Zustand zaten hydrate olduysa true yap
-    setHydrated(useAuthStore.persist.hasHydrated());
-    
+    queueMicrotask(() => setHydrated(useAuthStore.persist.hasHydrated()));
+
     // Henüz olmadıysa, bittiğinde true yap
     const unsubFinish = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
     

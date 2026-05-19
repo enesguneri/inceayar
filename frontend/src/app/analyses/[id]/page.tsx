@@ -5,7 +5,7 @@ import { analysisApi, Analysis } from '@/lib/services';
 import { Button } from '@/components/ui/Button';
 import {
   CheckCircle, Loader, XCircle, ArrowLeft, Copy, Check,
-  Search, PenTool, ShieldAlert, Edit3, Target, TrendingUp, AlertTriangle
+  Search, PenTool, ShieldAlert, Edit3, Target, TrendingUp, AlertTriangle, Trash2
 } from 'lucide-react';
 
 const AGENT_STEPS = [
@@ -34,7 +34,7 @@ export default function AnalysisDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    fetchAnalysis();
+    Promise.resolve().then(fetchAnalysis);
     // SSE ile canlı takip
     if (typeof window !== 'undefined') {
       const backendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -66,6 +66,17 @@ export default function AnalysisDetailPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const deleteAnalysis = async () => {
+    if (!confirm('Bu analizi silmek istediğinize emin misiniz?')) return;
+    try {
+      await analysisApi.delete(id);
+      router.push('/analyses');
+    } catch (e) {
+      console.error("Failed to delete analysis", e);
+      alert('Analiz silinirken hata oluştu.');
+    }
+  };
+
   const getAgentStatus = (agentKey: string) => {
     if (!analysis) return 'pending';
     const currentIdx = AGENT_STEPS.findIndex(s => s.key === analysis.currentAgent);
@@ -87,9 +98,9 @@ export default function AnalysisDetailPage() {
     <div className="text-center py-16 text-slate-400">Analiz bulunamadı.</div>
   );
 
-  const isProcessing = analysis.status === 'processing';
   const isCompleted = analysis.status === 'completed';
   const isFailed = analysis.status === 'failed';
+  const topComplaints = analysis.researchFindings?.topComplaints ?? [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -107,6 +118,13 @@ export default function AnalysisDetailPage() {
             {copied ? <><Check className="w-4 h-4 mr-2" />Kopyalandı!</> : <><Copy className="w-4 h-4 mr-2" />Metni Kopyala</>}
           </Button>
         )}
+        <button
+          onClick={deleteAnalysis}
+          className="p-2 ml-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+          title="Analizi Sil"
+        >
+          <Trash2 className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Agent Pipeline */}
@@ -115,7 +133,7 @@ export default function AnalysisDetailPage() {
           <Target className="w-4 h-4 text-brand-400" /> AI Ajan Süreci
         </h2>
         <div className="space-y-3">
-          {AGENT_STEPS.map((step, idx) => {
+          {AGENT_STEPS.map((step) => {
             const status = getAgentStatus(step.key);
             const Icon = step.icon;
             return (
@@ -196,7 +214,7 @@ export default function AnalysisDetailPage() {
               </div>
               {analysis.riskReport.risks?.length > 0 && (
                 <div className="space-y-2">
-                  {analysis.riskReport.risks.map((r: any, i: number) => (
+                  {analysis.riskReport.risks.map((r, i) => (
                     <div key={i} className="p-3 bg-yellow-500/5 border border-yellow-500/10 rounded-xl">
                       <p className="text-sm font-medium text-yellow-200 flex items-center gap-2">
                         <AlertTriangle className="w-3.5 h-3.5" /> {r.issue}
@@ -210,13 +228,13 @@ export default function AnalysisDetailPage() {
           )}
 
           {/* Research Findings */}
-          {analysis.researchFindings?.topComplaints?.length > 0 && (
+          {topComplaints.length > 0 && (
             <div className="glass-dark rounded-2xl border border-white/5 p-6 space-y-3">
               <h2 className="text-base font-semibold text-white flex items-center gap-2">
                 <Search className="w-4 h-4 text-brand-400" /> Rakipteki En Önemli Şikayetler
               </h2>
               <ul className="space-y-2">
-                {analysis.researchFindings.topComplaints.map((c: string, i: number) => (
+                {topComplaints.map((c, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-300">
                     <span className="w-5 h-5 rounded-full bg-brand-600/20 text-brand-400 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{i + 1}</span>
                     {c}

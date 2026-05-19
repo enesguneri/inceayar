@@ -3,11 +3,12 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Cpu, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Sliders, Mail, Lock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAuthStore } from '@/store/useAuthStore';
 import api from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/errors';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -31,8 +32,8 @@ export default function LoginPage() {
         login(user, accessToken);
         router.push('/dashboard');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Giriş yapılırken bir hata oluştu.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Giriş yapılırken bir hata oluştu.'));
     } finally {
       setIsLoading(false);
     }
@@ -48,7 +49,7 @@ export default function LoginPage() {
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2 group mb-6">
             <div className="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center shadow-xl shadow-brand-500/30 group-hover:scale-105 transition-transform duration-300">
-              <Cpu className="w-7 h-7 text-white" />
+              <Sliders className="w-7 h-7 text-white" />
             </div>
           </Link>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Hoş Geldiniz</h1>

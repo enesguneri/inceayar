@@ -3,15 +3,17 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Cpu, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { Sliders, Mail, Lock, User, ArrowRight, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAuthStore } from '@/store/useAuthStore';
 import api from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/errors';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [company, setCompany] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,15 +34,15 @@ export default function RegisterPage() {
     setError('');
 
     try {
-      const response = await api.post('/auth/register', { name, email, password });
+      const response = await api.post('/auth/register', { name, email, password, company });
       
       if (response.data.success) {
         const { user, accessToken } = response.data.data;
         login(user, accessToken);
         router.push('/dashboard');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Kayıt olurken bir hata oluştu.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Kayıt olurken bir hata oluştu.'));
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +58,7 @@ export default function RegisterPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 group mb-4">
             <div className="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center shadow-xl shadow-brand-500/30 group-hover:scale-105 transition-transform duration-300">
-              <Cpu className="w-7 h-7 text-white" />
+              <Sliders className="w-7 h-7 text-white" />
             </div>
           </Link>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Hesap Oluşturun</h1>
@@ -79,6 +81,15 @@ export default function RegisterPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               icon={<User className="w-5 h-5" />}
+              required
+            />
+
+            <Input
+              type="text"
+              placeholder="İşletme Adınız"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              icon={<Building2 className="w-5 h-5" />}
               required
             />
 

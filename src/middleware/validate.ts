@@ -35,7 +35,16 @@ export const validate = (schema: ZodObject<ZodRawShape>) => {
         }
       }
 
-      throw new ValidationError("Geçersiz veri", details);
+      // Kullanıcıya anlamlı bir mesaj oluştur
+      const allMessages: string[] = [];
+      for (const [, messages] of Object.entries(details)) {
+        if (messages && messages.length > 0) {
+          allMessages.push(...messages);
+        }
+      }
+      const userMessage = allMessages.length > 0 ? allMessages.join('. ') : "Geçersiz veri";
+
+      throw new ValidationError(userMessage, details);
     }
 
     // Doğrulanmış verileri request'e geri yaz

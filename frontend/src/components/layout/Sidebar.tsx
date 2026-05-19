@@ -2,16 +2,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Target, List, Settings, Cpu } from 'lucide-react';
+import { LayoutDashboard, Target, List, Settings, Sliders, Package } from 'lucide-react';
 
 export const Sidebar = () => {
   const pathname = usePathname();
 
   const navItems = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Ana Sayfa', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Yeni Analiz', href: '/analyses/new', icon: Target },
     { name: 'Analizlerim', href: '/analyses', icon: List },
-    { name: 'Ürünlerim', href: '/products', icon: Cpu },
+    { name: 'Ürünlerim', href: '/products', icon: Package },
     { name: 'Ayarlar', href: '/settings', icon: Settings },
   ];
 
@@ -20,7 +20,7 @@ export const Sidebar = () => {
       <div className="h-16 flex items-center px-6 border-b border-white/5">
         <Link href="/" className="flex items-center gap-2 group">
           <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/30 group-hover:scale-105 transition-transform">
-            <Cpu className="w-5 h-5 text-white" />
+            <Sliders className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold tracking-tight text-white">
             İnce<span className="premium-gradient-text">Ayar</span>
@@ -57,8 +57,8 @@ export const Sidebar = () => {
         <div className="bg-gradient-to-br from-brand-900/40 to-indigo-900/40 border border-brand-500/20 rounded-xl p-4">
           <h4 className="text-sm font-semibold text-white mb-1">PRO Plan</h4>
           <p className="text-xs text-slate-400 mb-3">Sınırsız AI analizi için yükseltin.</p>
-          <button className="w-full text-xs bg-brand-600 hover:bg-brand-500 text-white font-medium py-2 rounded-lg transition-colors">
-            Yükselt
+          <button className="w-full text-xs bg-brand-600 hover:bg-brand-500 text-white font-medium py-2 rounded-lg transition-colors" disabled>
+            Yakında
           </button>
         </div>
       </div>

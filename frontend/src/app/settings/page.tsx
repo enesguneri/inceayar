@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { productApi, analysisApi } from '@/lib/services';
-import { Package, Settings, LogOut, User, Mail, Building2, ChevronRight } from 'lucide-react';
+import { LogOut, User, Mail, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 export default function SettingsPage() {
@@ -67,6 +66,7 @@ export default function SettingsPage() {
         <div className="divide-y divide-white/5">
           {[
             { icon: User, label: 'Ad Soyad', value: user?.name },
+            { icon: Building2, label: 'İşletme Adı', value: user?.company || 'Belirtilmemiş' },
             { icon: Mail, label: 'E-posta', value: user?.email },
           ].map(item => (
             <div key={item.label} className="flex items-center gap-4 p-4">
@@ -94,7 +94,7 @@ export default function SettingsPage() {
             <span className="px-3 py-1 bg-brand-600/20 border border-brand-500/30 text-brand-300 rounded-full text-xs font-medium">Aktif</span>
           </div>
           <Button variant="primary" size="sm" className="mt-4">
-            PRO'ya Yükselt — Sınırsız Analiz
+            PRO&apos;ya Yükselt — Sınırsız Analiz (Yakında)
           </Button>
         </div>
       </div>

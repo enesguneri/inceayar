@@ -30,11 +30,12 @@ const generateTokens = (userId: string) => {
 export const registerUser = async (data: Partial<IUser>): Promise<AuthResponse> => {
   const { name, email, password, company } = data;
 
-  if (!name || !email || !password) {
+  if (!name || !email || !password || !company) {
     throw new ValidationError("Eksik bilgi", {
       name: name ? [] : ["İsim zorunlu"],
       email: email ? [] : ["Email zorunlu"],
       password: password ? [] : ["Şifre zorunlu"],
+      company: company ? [] : ["İşletme adı zorunlu"],
     });
   }
 

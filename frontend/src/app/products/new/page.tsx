@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { productApi } from '@/lib/services';
+import { getApiErrorMessage } from '@/lib/errors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Package, Plus, Trash2, ArrowLeft, Info, Clock } from 'lucide-react';
+import { Package, Plus, Trash2, ArrowLeft, Info, Clock, X } from 'lucide-react';
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -25,6 +26,8 @@ export default function NewProductPage() {
   const [activeTab, setActiveTab] = useState<'manual' | 'link'>('manual');
   const [linkUrl, setLinkUrl] = useState('');
   const [fetchingDetails, setFetchingDetails] = useState(false);
+  const [manualImageFiles, setManualImageFiles] = useState<FileList | null>(null);
+  const [autoImages, setAutoImages] = useState<string[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -42,9 +45,7 @@ export default function NewProductPage() {
     setFetchingDetails(true);
     setError('');
     try {
-      // Axios default import can be used, or use api from lib
-      const api = (await import('@/lib/api')).default;
-      const res = await api.post('/products/scrape-details', { url: linkUrl });
+      const res = await productApi.scrapeDetails(linkUrl);
       const data = res.data?.data;
       if (data) {
         setForm(prev => ({
@@ -55,6 +56,7 @@ export default function NewProductPage() {
           advantages: data.advantages || prev.advantages,
           url: linkUrl, // Save the URL in form state to send to backend!
         }));
+        setAutoImages(data.images ?? []);
         
         // Populate features if any exist
         if (data.features && Object.keys(data.features).length > 0) {
@@ -64,8 +66,8 @@ export default function NewProductPage() {
         // Switch to manual tab to let user review the fetched data
         setActiveTab('manual');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ürün bilgileri çekilirken hata oluştu.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Ürün bilgileri çekilirken hata oluştu.'));
     } finally {
       setFetchingDetails(false);
     }
@@ -73,9 +75,20 @@ export default function NewProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (autoImages.length === 0 && !manualImageFiles?.length) {
+      setError('Lütfen en az bir ürün fotoğrafı ekleyin.');
+      return;
+    }
+    if ((manualImageFiles?.length ?? 0) > 5) {
+      setError('En fazla 5 fotoğraf yükleyebilirsiniz.');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
+      const manualImageCount = manualImageFiles?.length ?? 0;
+      const initialImages = autoImages.slice(0, Math.max(0, 5 - manualImageCount));
       const featureMap = features
         .filter(f => f.key && f.value)
         .reduce<Record<string, string>>((acc, f) => ({ ...acc, [f.key]: f.value }), {});
@@ -83,13 +96,17 @@ export default function NewProductPage() {
       const res = await productApi.create({
         ...form,
         features: featureMap,
-        images: [],
+        images: initialImages,
       });
 
       const productId = res.data?.data?._id;
+      if (productId && manualImageFiles?.length) {
+        await productApi.uploadImages(productId, manualImageFiles);
+      }
+
       router.push(productId ? `/products/${productId}` : '/products');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ürün oluşturulurken bir hata oluştu.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Ürün oluşturulurken bir hata oluştu.'));
     } finally {
       setLoading(false);
     }
@@ -182,6 +199,47 @@ export default function NewProductPage() {
             rows={4}
             className="w-full bg-dark-surface/50 border border-dark-border text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-slate-500 resize-none"
           />
+        </div>
+
+        <div className="glass-dark rounded-2xl border border-white/5 p-6 space-y-4">
+          <h2 className="text-base font-semibold text-white flex items-center gap-2">
+            <Package className="w-4 h-4 text-brand-400" /> Ürün Fotoğrafı
+          </h2>
+          <p className="text-xs text-slate-400 -mt-1">
+            Manuel eklemede fotoğraf yükleyin. Link ile eklediyseniz Trendyol görseli otomatik doldurulur.
+          </p>
+
+          {autoImages.length > 0 && (
+            <div className="grid grid-cols-5 gap-2">
+              {autoImages.map((imageUrl) => (
+                <div key={imageUrl} className="aspect-square overflow-hidden rounded-lg border border-white/10 bg-slate-800 relative group">
+                  <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                  <button 
+                    type="button" 
+                    onClick={() => setAutoImages(prev => prev.filter(url => url !== imageUrl))}
+                    className="absolute top-1 right-1 p-1 bg-black/50 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/20 bg-white/5 px-4 py-5 text-sm text-slate-300 transition-all hover:border-brand-500/50 hover:text-white">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(event) => setManualImageFiles(event.target.files)}
+            />
+            {manualImageFiles?.length
+              ? `${manualImageFiles.length} fotoğraf seçildi`
+              : autoImages.length > 0
+                ? 'Farklı fotoğraf yükle'
+                : 'Fotoğraf seç'}
+          </label>
         </div>
 
         <div className="glass-dark rounded-2xl border border-white/5 p-6 space-y-4">

@@ -7,6 +7,7 @@ import { withRetry } from "../../utils/retry";
 const writerSchema = z.object({
   draftDescription: z.string().describe("SEO uyumlu ve ikna edici taslak e-ticaret ürün açıklaması"),
   seoKeywords: z.array(z.string()).describe("Bu metin için hedeflenmiş SEO anahtar kelimeleri (en az 5 adet)"),
+  generatedAdvantages: z.string().describe("Ürünün temel özellikleri ve rakip analizinden yola çıkarak çıkarılan 3-4 maddelik kısa avantajları. Müşterinin neden alması gerektiğini özetler.").optional(),
 });
 
 const prompt = PromptTemplate.fromTemplate(`
@@ -47,6 +48,7 @@ export const writerAgent = async (state: AnalysisStateType): Promise<Partial<Ana
   return {
     draftDescription: result.draftDescription,
     seoKeywords: result.seoKeywords,
+    generatedAdvantages: result.generatedAdvantages || null,
     currentAgent: "auditor", // Bir sonraki ajana geçir
   };
 };

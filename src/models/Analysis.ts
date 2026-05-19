@@ -16,8 +16,8 @@ export interface IAnalysis extends Document {
 }
 
 const AnalysisSchema: Schema = new Schema({
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
     competitorReviews: [{ type: Schema.Types.Mixed, required: true }],
     status: { type: String, enum: ['processing', 'completed', 'failed'], default: 'processing' },
     currentAgent: { type: String, default: 'researcher' },
