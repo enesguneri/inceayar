@@ -1,11 +1,18 @@
 import dotenv from "dotenv";
 import { z } from "zod";
 
+import fs from "fs";
+
 // .env dosyasını yükle
 if (process.env.NODE_ENV === "test") {
   dotenv.config({ path: ".env.test", override: true });
 } else {
-  dotenv.config({ override: true });
+  // Render'ın varsayılan Secret File konumu (/etc/secrets/.env) kontrol edilir
+  if (fs.existsSync("/etc/secrets/.env")) {
+    dotenv.config({ path: "/etc/secrets/.env", override: true });
+  } else {
+    dotenv.config({ override: true });
+  }
 }
 
 /**
