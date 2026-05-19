@@ -12,6 +12,7 @@ puppeteer.use(StealthPlugin());
 export const resolveRedirectUrl = async (url: string): Promise<string> => {
   if (url.includes('ty.gl') || !url.includes('trendyol.com') && !url.includes('hepsiburada.com')) {
     try {
+      // 1. Standart hızlı fetch ile dene (HEAD)
       const response = await fetch(url, {
         method: "HEAD",
         redirect: "follow",
@@ -19,20 +20,57 @@ export const resolveRedirectUrl = async (url: string): Promise<string> => {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
-      return response.url || url;
+      if (response.url && (response.url.includes('trendyol.com') || response.url.includes('hepsiburada.com'))) {
+        return response.url;
+      }
     } catch (err) {
-      console.warn(`[Scraper] URL yönlendirme çözme başarısız oldu (HEAD denendi):`, err);
-      try {
-        const response = await fetch(url, {
-          method: "GET",
-          redirect: "follow",
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-          }
-        });
-        return response.url || url;
-      } catch (error) {
-        console.error(`[Scraper] URL yönlendirme çözme tamamen başarısız oldu:`, error);
+      console.warn(`[Scraper] URL yönlendirme çözme HEAD ile başarısız (GET denenecek):`, err);
+    }
+
+    try {
+      // 2. Standart hızlı fetch ile dene (GET)
+      const response = await fetch(url, {
+        method: "GET",
+        redirect: "follow",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+      });
+      if (response.url && (response.url.includes('trendyol.com') || response.url.includes('hepsiburada.com'))) {
+        return response.url;
+      }
+    } catch (err) {
+      console.warn(`[Scraper] URL yönlendirme çözme GET ile başarısız (Puppeteer denenecek):`, err);
+    }
+
+    // 3. BULLETPROOF FALLBACK: Puppeteer ile yönlendirmeyi çöz
+    console.log(`[Scraper] Fetch ile çözülemedi. Puppeteer ile yönlendirme çözülüyor: ${url}`);
+    let browser;
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox', 
+          '--disable-blink-features=AutomationControlled',
+          '--disable-web-security'
+        ]
+      });
+      const page = await browser.newPage();
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      
+      // Sayfa yönlenene kadar bekle
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      const finalUrl = page.url();
+      console.log(`[Scraper] Puppeteer ile çözülen URL: ${finalUrl}`);
+      if (finalUrl && (finalUrl.includes('trendyol.com') || finalUrl.includes('hepsiburada.com'))) {
+        return finalUrl;
+      }
+    } catch (puppeteerErr) {
+      console.error(`[Scraper] Puppeteer ile yönlendirme çözme başarısız:`, puppeteerErr);
+    } finally {
+      if (browser) {
+        await browser.close();
       }
     }
   }
