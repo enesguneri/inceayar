@@ -3,6 +3,8 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
 COPY package*.json ./
 COPY tsconfig.json ./
 
