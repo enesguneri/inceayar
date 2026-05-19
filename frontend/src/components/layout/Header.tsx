@@ -1,12 +1,16 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Bell, Search, LogOut, CheckCircle } from 'lucide-react';
+import { Bell, Search, LogOut, CheckCircle, Menu } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { analysisApi, Analysis } from '@/lib/services';
 import Link from 'next/link';
 
-export const Header = () => {
+interface HeaderProps {
+  onMenuClick: () => void;
+}
+
+export const Header = ({ onMenuClick }: HeaderProps) => {
   const { user, logout } = useAuthStore();
   const [showNotifications, setShowNotifications] = useState(false);
   const [completedAnalyses, setCompletedAnalyses] = useState<Analysis[]>([]);
@@ -42,6 +46,15 @@ export const Header = () => {
   return (
     <header className="sticky top-0 z-40 w-full glass-dark border-b-0 border-white/5 py-3 px-6 flex items-center justify-between">
       <div className="flex items-center gap-4 w-1/3">
+        {/* Mobilde Menüyü Açan Hamburger Butonu */}
+        <button 
+          onClick={onMenuClick}
+          className="p-2 -ml-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 md:hidden transition-colors"
+          title="Menüyü Aç"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+
         <div className="relative w-full max-w-md hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input 
