@@ -10,7 +10,6 @@
     "lib": ["ES2022"],
     "types": ["node"],
     "moduleResolution": "node",
-    "ignoreDeprecations": "6.0",
 
     // Other Outputs
     "sourceMap": true,

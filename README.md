@@ -2,6 +2,11 @@
 
 > E-ticaret satıcıları için Gemini destekli, çoklu ajan tabanlı ürün metni optimizasyon ve iade riski analiz platformu.
 
+## 🌐 Canlı Uygulama Linkleri
+
+- **Canlı Web Uygulaması (Frontend - Vercel)**: [https://inceayar.vercel.app](https://inceayar.vercel.app)
+- **Canlı API Sunucusu (Backend - Render)**: [https://inceayar-backend.onrender.com](https://inceayar-backend.onrender.com)
+
 ---
 
 ## 📋 İçindekiler
